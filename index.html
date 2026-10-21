@@ -144,6 +144,29 @@ statusSelect.addEventListener("change", function() {
 });
 
 item.appendChild(statusSelect);
+      const progressLabel = document.createElement("p");
+progressLabel.textContent = "Fremdrift: 0%";
+
+const progressInput = document.createElement("input");
+progressInput.type = "range";
+progressInput.min = "0";
+progressInput.max = "100";
+progressInput.value = "0";
+
+const progressBar = document.createElement("progress");
+progressBar.max = 100;
+progressBar.value = 0;
+progressBar.style.width = "100%";
+
+progressInput.addEventListener("input", function() {
+  progressLabel.textContent = "Fremdrift: " + progressInput.value + "%";
+  progressBar.value = Number(progressInput.value);
+  saveProjects();
+});
+
+item.appendChild(progressLabel);
+item.appendChild(progressInput);
+item.appendChild(progressBar);
 
       const list = document.getElementById("projects");
       if (list.querySelector(".muted")?.textContent ===
