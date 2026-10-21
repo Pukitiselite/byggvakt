@@ -249,13 +249,46 @@ photoPreview.style.marginTop = "10px";
 photoPreview.style.display = "none";
 item.appendChild(photoPreview);
 
-photoInput.addEventListener("change", function() {
+photoInput.addEventListener("change", async function() {
   const file = photoInput.files[0];
+  if (!file) return;
 
-  if (file) {
-    photoPreview.src = URL.createObjectURL(file);
-    photoPreview.style.display = "block";
+  const { data: { user }, error: userError } =
+    await supabaseClient.auth.getUser();
+
+  if (userError || !user) {
+    alert("Du må logge inn først.");
+    return;
   }
+
+  if (!file.type.startsWith("image/")) {
+    alert("Velg en bildefil.");
+    return;
+  }
+
+  const filePath =
+    user.id + "/" + crypto.randomUUID() + "-" +
+    file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+
+  const { error } = await supabaseClient.storage
+    .from("byggvakt-bilder")
+    .upload(filePath, file, {
+      contentType: file.type
+    });
+
+  if (error) {
+    alert("Kunne ikke laste opp bildet: " + error.message);
+    return;
+  }
+
+  photoPreview.src = URL.createObjectURL(file);
+  photoPreview.style.display = "block";
+
+  // Saglabā foto atrašanās vietu projekta kartītē
+  photoPreview.dataset.storagePath = filePath;
+  saveProjects();
+
+  alert("Bildet er lagret!");
 }); const deleteButton = document.createElement("button");
 deleteButton.textContent = "Slett prosjekt";
 deleteButton.type = "button";
