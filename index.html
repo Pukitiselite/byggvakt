@@ -185,6 +185,21 @@ notesInput.addEventListener("input", function() {
 
 item.appendChild(notesLabel);
 item.appendChild(notesInput);
+      const deleteButton = document.createElement("button");
+deleteButton.textContent = "Slett prosjekt";
+deleteButton.type = "button";
+deleteButton.className = "button";
+deleteButton.style.background = "#c0392b";
+deleteButton.style.marginTop = "12px";
+
+deleteButton.addEventListener("click", function() {
+  if (confirm("Er du sikker på at du vil slette prosjektet?")) {
+    item.remove();
+    saveProjects();
+  }
+});
+
+item.appendChild(deleteButton);
 
       const list = document.getElementById("projects");
       if (list.querySelector(".muted")?.textContent ===
