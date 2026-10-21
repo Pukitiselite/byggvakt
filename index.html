@@ -107,7 +107,7 @@ const uuid=()=>globalThis.crypto?.randomUUID?.()||("p-"+Date.now()+"-"+Math.rand
 function normalizeStatus(s){
   const v=String(s||"");
   if(v==="Ferdig"||v==="done")return "Ferdig";
-  if(v==="PÃ¥gÃ¥r"||v==="active"||v==="PÃƒÂ¥gÃƒÂ¥r"||v==="PÃƒÆ’Ã‚Â¥gÃƒÆ’Ã‚Â¥r"||v==="PÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¥gÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¥r")return "PÃ¥gÃ¥r";
+  if(v==="PÃ¥gÃ¥r"||v==="active"||(/^P/.test(v)&&(/[ÃƒÃ…]/.test(v))))return "PÃ¥gÃ¥r";
   return "Planlagt";
 }
 function cleanProject(p){return{id:String(p.id||uuid()),name:String(p.name||"").slice(0,140),address:String(p.address||"").slice(0,250),status:normalizeStatus(p.status),progress:Math.min(100,Math.max(0,Number(p.progress)||0)),notes:String(p.notes||""),photos:Array.isArray(p.photos)?p.photos.filter(x=>typeof x==="string"&&x.length<1000):[]}}
@@ -160,4 +160,3 @@ $("aiAnalyze").addEventListener("click",async()=>{
 load();applyLanguage();updateAuth();
 </script>
 </body></html>
-```
