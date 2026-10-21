@@ -52,7 +52,7 @@ textarea{min-height:105px;resize:vertical}label{display:block;font-weight:650;fo
 </style>
 </head>
 <body>
-<header><div class="shell topbar"><div class="brand">🏗️ Byggvakt AI</div><div class="tagline" data-i18n="tagline">Enkel oversikt over byggeprosjekter</div></div><div class="header-actions"><span id="userPill" class="user-pill"></span><select id="language" class="lang" aria-label="Language"><option value="no">Norsk</option><option value="en">English</option></select><button id="logout" class="btn secondary smallbtn hidden" data-i18n="logout">Logg ut</button></div></div></header>
+<header><div class="shell topbar"><div class="brand">ðŸ—ï¸ Byggvakt AI</div><div class="tagline" data-i18n="tagline">Enkel oversikt over byggeprosjekter</div></div><div class="header-actions"><span id="userPill" class="user-pill"></span><select id="language" class="lang" aria-label="Language"><option value="no">Norsk</option><option value="en">English</option></select><button id="logout" class="btn secondary smallbtn hidden" data-i18n="logout">Logg ut</button></div></div></header>
 <main class="shell">
 <div class="intro"><div><h1 data-i18n="dashboard">Prosjektoversikt</h1><p class="muted" data-i18n="subtitle">Status, fremdrift, notater og bilder pÃ¥ ett sted.</p></div><button id="newProject" class="btn" data-i18n="add">+ Nytt prosjekt</button></div>
 <section class="stats" aria-label="Statistics"><div class="card stat"><div class="value" id="statTotal">0</div><div class="label" data-i18n="all">Alle prosjekter</div></div><div class="card stat"><div class="value" id="statPlanned">0</div><div class="label" data-i18n="planned">Planlagt</div></div><div class="card stat"><div class="value" id="statActive">0</div><div class="label" data-i18n="active">PÃ¥gÃ¥r</div></div><div class="card stat"><div class="value" id="statDone">0</div><div class="label" data-i18n="done">Ferdig</div></div></section>
@@ -103,7 +103,7 @@ const uuid=()=>globalThis.crypto?.randomUUID?.()||("p-"+Date.now()+"-"+Math.rand
 function normalizeStatus(s){
   const v=String(s||"");
   if(v==="Ferdig"||v==="done")return "Ferdig";
-  if(v==="PÃ¥gÃ¥r"||v==="PÃƒÂ¥gÃƒÂ¥r"||v==="active"||(/^P/.test(v)&&(/[ÃƒÃ…]/.test(v))))return "PÃ¥gÃ¥r";
+  if(v==="PÃ¥gÃ¥r"||v==="P\u00c3\u00a5g\u00c3\u00a5r"||v==="P\u00c3\u0192\u00c2\u00a5g\u00c3\u0192\u00c2\u00a5r"||v==="active"||(/^P/.test(v)&&(/[\u00c3\u00c5]/.test(v))))return "PÃ¥gÃ¥r";
   return "Planlagt";
 }
 function cleanProject(p){return{id:String(p.id||uuid()),name:String(p.name||"").slice(0,140),address:String(p.address||"").slice(0,250),status:normalizeStatus(p.status),progress:Math.min(100,Math.max(0,Number(p.progress)||0)),notes:String(p.notes||""),photos:Array.isArray(p.photos)?p.photos.filter(x=>typeof x==="string"&&x.length<1000):[]}}
