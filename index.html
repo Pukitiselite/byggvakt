@@ -340,11 +340,11 @@ item.appendChild(deleteButton);
 
 function addDeleteButtons() {
   document.querySelectorAll(".project").forEach(function(item) {
-    const existingButton = item.querySelector(".delete-project");
-
-    if (existingButton) {
-      existingButton.remove();
-    }
+item.querySelectorAll("button").forEach(function(button) {
+  if (button.textContent.trim() === "Slett prosjekt") {
+    button.remove();
+  }
+});
 
     const button = document.createElement("button");
     button.textContent = "Slett prosjekt";
