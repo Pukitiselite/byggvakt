@@ -101,6 +101,13 @@
   </main>
 
   <script>
+    const supabaseUrl = "https://fzsxqcqkzxrfxoirfmyh.supabase.co";
+const supabaseKey = "sb_publishable__tjgQ5uGHOd_j-l06VnlVQ_st5GWCf2";
+
+const supabaseClient = window.supabase.createClient(
+  supabaseUrl,
+  supabaseKey
+);
     function showForm() {
       document.getElementById("projectForm").style.display = "block";
     }
