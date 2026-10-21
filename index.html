@@ -1,0 +1,139 @@
+
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Byggvakt AI</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f3f6f4;
+      color: #18352b;
+    }
+    header {
+      background: #153d30;
+      color: white;
+      padding: 24px;
+    }
+    header h1 { margin: 0; }
+    header p { margin-bottom: 0; color: #d4e8dc; }
+    main { max-width: 900px; margin: 36px auto; padding: 0 20px; }
+    .card {
+      background: white;
+      padding: 24px;
+      margin-bottom: 20px;
+      border-radius: 14px;
+      box-shadow: 0 3px 12px #17392b0d;
+    }
+    .button {
+      background: #19764e;
+      color: white;
+      padding: 12px 18px;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .muted { color: #64756d; }
+    #projectForm { display: none; margin-top: 20px; }
+    input {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0 16px;
+      border: 1px solid #ccd7d0;
+      border-radius: 8px;
+    }
+    .project {
+      border-top: 1px solid #e0e8e3;
+      padding: 14px 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🏗️ Byggvakt AI</h1>
+    <p>Smart overvåking av byggeprosjekter</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Byggeplassoversikt</h2>
+      <p class="muted">
+        Hold oversikt over prosjekter, fremdrift og observasjoner.
+      </p>
+      <button class="button" onclick="showForm()">
+        + Legg til byggeprosjekt
+      </button>
+
+      <form id="projectForm">
+        <label for="projectName">Prosjektnavn</label>
+        <input id="projectName" required
+          placeholder="F.eks. Boligprosjekt Molde">
+        <label for="projectAddress">Adresse</label>
+        <input id="projectAddress" placeholder="Byggeplassens adresse">
+        <button class="button" type="submit">
+          Opprett prosjekt
+        </button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Mine byggeprosjekter</h2>
+      <div id="projects">
+        <p class="muted">Ingen prosjekter lagt til ennå.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>AI-assistent</h2>
+      <p>
+        AI-analyse av bilder, fremdrift og risiko kommer i neste versjon.
+      </p>
+      <p class="muted">
+        AI-funksjonen er ikke aktivert ennå.
+      </p>
+    </section>
+  </main>
+
+  <script>
+    function showForm() {
+      document.getElementById("projectForm").style.display = "block";
+    }
+
+    document.getElementById("projectForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+
+      const name = document.getElementById("projectName").value.trim();
+      const address = document.getElementById("projectAddress").value.trim();
+
+      if (!name) return;
+
+      const item = document.createElement("div");
+      item.className = "project";
+
+      const title = document.createElement("strong");
+      title.textContent = name;
+      item.appendChild(title);
+
+      const location = document.createElement("p");
+      location.className = "muted";
+      location.textContent = address || "Ingen adresse oppgitt";
+      item.appendChild(location);
+
+      const list = document.getElementById("projects");
+      if (list.querySelector(".muted")?.textContent ===
+          "Ingen prosjekter lagt til ennå.") {
+        list.replaceChildren();
+      }
+
+      list.appendChild(item);
+      this.reset();
+      this.style.display = "none";
+    });
+  </script>
+</body>
+</html>
