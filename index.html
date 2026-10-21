@@ -410,7 +410,20 @@ function loadProjects() {
       });
     }
   });
+document.querySelectorAll(".project img[data-storage-path]").forEach(
+  async function(img) {
+    const path = img.dataset.storagePath;
 
+    const { data, error } = await supabaseClient.storage
+      .from("byggvakt-bilder")
+      .createSignedUrl(path, 3600);
+
+    if (!error && data) {
+      img.src = data.signedUrl;
+      img.style.display = "block";
+    }
+  }
+);
   addDeleteButtons();
 }
 
