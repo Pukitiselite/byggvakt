@@ -235,6 +235,27 @@ function saveProjects() {
 
 // Atjauno saglabātos projektus
 function loadProjects() {
+  function addDeleteButtons() {
+  document.querySelectorAll(".project").forEach(function(item) {
+    if (item.querySelector(".delete-project")) return;
+
+    const button = document.createElement("button");
+    button.textContent = "Slett prosjekt";
+    button.type = "button";
+    button.className = "button delete-project";
+    button.style.background = "#c0392b";
+    button.style.marginTop = "12px";
+
+    button.addEventListener("click", function() {
+      if (confirm("Er du sikker på at du vil slette prosjektet?")) {
+        item.remove();
+        saveProjects();
+      }
+    });
+
+    item.appendChild(button);
+  });
+}
   const saved = localStorage.getItem("byggvaktProjects");
   if (saved) {
     document.getElementById("projects").innerHTML = saved;
