@@ -56,8 +56,8 @@
 </head>
 <body>
   <header>
-    <h1>🏗️ Byggvakt AI</h1>
-    <p>Smart overvåking av byggeprosjekter</p>
+    <h1>ðŸ—ï¸ Byggvakt AI</h1>
+    <p>Smart overvÃ¥king av byggeprosjekter</p>
   </header>
 
   <main>
@@ -78,7 +78,23 @@
     </button>
   </form>
 
-  <p id="loginMessage"></p>
+  <p id="loginMessage" role="status"></p>
+  <button id="forgotPasswordButton" class="button" type="button" style="background:#52675e">Glemt passord?</button>
+  <form id="forgotPasswordForm" style="display:none; margin-top:16px">
+    <label for="recoveryEmail">E-post for tilbakestilling</label>
+    <input id="recoveryEmail" type="email" required placeholder="Din e-postadresse">
+    <button class="button" type="submit">Send tilbakestillingslenke</button>
+  </form>
+  <p id="recoveryMessage" role="status"></p>
+  <form id="newPasswordForm" style="display:none; margin-top:16px">
+    <h3>Velg nytt passord</h3>
+    <label for="newPassword">Nytt passord (minst 8 tegn)</label>
+    <input id="newPassword" type="password" minlength="8" autocomplete="new-password" required>
+    <label for="confirmPassword">Gjenta nytt passord</label>
+    <input id="confirmPassword" type="password" minlength="8" autocomplete="new-password" required>
+    <button class="button" type="submit">Lagre nytt passord</button>
+  </form>
+  <p id="passwordChangeMessage" role="status"></p>
 </section>
     <section class="card">
       <h2>Byggeplassoversikt</h2>
@@ -104,7 +120,7 @@
     <section class="card">
       <h2>Mine byggeprosjekter</h2>
       <div id="projects">
-        <p class="muted">Ingen prosjekter lagt til ennå.</p>
+        <p class="muted">Ingen prosjekter lagt til ennÃ¥.</p>
       </div>
     </section>
 
@@ -114,7 +130,7 @@
         AI-analyse av bilder, fremdrift og risiko kommer i neste versjon.
       </p>
       <p class="muted">
-        AI-funksjonen er ikke aktivert ennå.
+        AI-funksjonen er ikke aktivert ennÃ¥.
       </p>
     </section>
   </main>
@@ -126,27 +142,103 @@ const supabaseKey = "sb_publishable__tjgQ5uGHOd_j-l06VnlVQ_st5GWCf2";
 const supabaseClient = window.supabase.createClient(
   supabaseUrl,
   supabaseKey
-);document.getElementById("loginForm").addEventListener("submit", async function(e) {
-  e.preventDefault();
+);
 
-  const email = document.getElementById("loginEmail").value;
-  const password = document.getElementById("loginPassword").value;
-  const message = document.getElementById("loginMessage");
+ document.getElementById("loginForm").addEventListener("submit", async function(e) {
+   e.preventDefault();
+   const email = document.getElementById("loginEmail").value.trim();
+   const password = document.getElementById("loginPassword").value;
+   const message = document.getElementById("loginMessage");
+   message.textContent = "Logger inn...";
+   try {
+     const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+     if (error) {
+       message.textContent = "Innlogging feilet: " + error.message;
+     } else {
+       message.textContent = "Du er logget inn!";
+       document.getElementById("loginPassword").value = "";
+     }
+   } catch (err) {
+     message.textContent = "Tilkoblingsfeil: " + (err.message || String(err));
+   }
+ });
 
-  message.textContent = "Logger inn...";
+    // Supabase sender brukeren tilbake til denne siden etter gjenoppretting.
+    // Kun gjenopprettingslenker skal Ã¥pne skjemaet for nytt passord.
+    let recoveryMode = new URLSearchParams(window.location.hash.slice(1)).get("type") === "recovery";
+    const newPasswordForm = document.getElementById("newPasswordForm");
+    const recoveryMessage = document.getElementById("recoveryMessage");
+    const passwordChangeMessage = document.getElementById("passwordChangeMessage");
 
-  const { error } = await supabaseClient.auth.signInWithPassword({
-    email: email,
-    password: password
-  });
+    function showRecoveryForm() {
+      recoveryMode = true;
+      newPasswordForm.style.display = "block";
+      document.getElementById("loginForm").style.display = "none";
+      document.getElementById("forgotPasswordButton").style.display = "none";
+      document.getElementById("forgotPasswordForm").style.display = "none";
+      recoveryMessage.textContent = "Skriv inn ditt nye passord nedenfor.";
+    }
 
-  if (error) {
-    message.textContent = "Innlogging feilet: " + error.message;
-  } else {
-    message.textContent = "Du er logget inn!";
-    document.getElementById("loginPassword").value = "";
-  }
-});
+    supabaseClient.auth.onAuthStateChange(function(event) {
+      if (event === "PASSWORD_RECOVERY") showRecoveryForm();
+    });
+
+    if (recoveryMode) showRecoveryForm();
+
+    document.getElementById("forgotPasswordButton").addEventListener("click", function() {
+      const form = document.getElementById("forgotPasswordForm");
+      form.style.display = form.style.display === "none" ? "block" : "none";
+      document.getElementById("recoveryEmail").value = document.getElementById("loginEmail").value.trim();
+    });
+
+    document.getElementById("forgotPasswordForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+      recoveryMessage.textContent = "Sender lenke...";
+      try {
+        const email = document.getElementById("recoveryEmail").value.trim();
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin + window.location.pathname
+        });
+        if (error) {
+          recoveryMessage.textContent = error.message.toLowerCase().includes("rate limit")
+            ? "For mange e-poster er sendt. Vent til grensen er tilbakestilt fÃ¸r du prÃ¸ver igjen."
+            : "Kunne ikke sende lenke: " + error.message;
+        } else {
+          recoveryMessage.textContent = "Hvis e-postadressen finnes, vil du motta en lenke. Sjekk ogsÃ¥ sÃ¸ppelpost.";
+        }
+      } catch (err) {
+        recoveryMessage.textContent = "Tilkoblingsfeil: " + (err.message || String(err));
+      }
+    });
+
+    document.getElementById("newPasswordForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+      const password = document.getElementById("newPassword").value;
+      const confirm = document.getElementById("confirmPassword").value;
+      if (password !== confirm) {
+        passwordChangeMessage.textContent = "Passordene er ikke like.";
+        return;
+      }
+      passwordChangeMessage.textContent = "Lagrer passord...";
+      try {
+        const { error } = await supabaseClient.auth.updateUser({ password });
+        if (error) {
+          passwordChangeMessage.textContent = "Kunne ikke endre passord: " + error.message;
+          return;
+        }
+        passwordChangeMessage.textContent = "Passordet er endret! Du kan logge inn med det nye passordet.";
+        newPasswordForm.reset();
+        newPasswordForm.style.display = "none";
+        document.getElementById("loginForm").style.display = "block";
+        document.getElementById("forgotPasswordButton").style.display = "inline-block";
+        recoveryMode = false;
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+        await supabaseClient.auth.signOut();
+      } catch (err) {
+        passwordChangeMessage.textContent = "Tilkoblingsfeil: " + (err.message || String(err));
+      }
+    });
+
     function showForm() {
       document.getElementById("projectForm").style.display = "block";
     }
@@ -176,7 +268,7 @@ statusText.textContent = "Status: " + status;
 item.appendChild(statusText);
       const statusSelect = document.createElement("select");
 
-["Planlagt", "Pågår", "Ferdig"].forEach(function(value) {
+["Planlagt", "PÃ¥gÃ¥r", "Ferdig"].forEach(function(value) {
   const option = document.createElement("option");
   option.value = value;
   option.textContent = value;
@@ -232,7 +324,7 @@ notesInput.addEventListener("input", function() {
 
 item.appendChild(notesLabel);
 item.appendChild(notesInput);
-     // Fotogrāfijas pievienošana
+     // FotogrÄfijas pievienoÅ¡ana
 const photoLabel = document.createElement("p");
 photoLabel.textContent = "Bilder fra byggeplassen:";
 item.appendChild(photoLabel);
@@ -257,7 +349,7 @@ photoInput.addEventListener("change", async function() {
     await supabaseClient.auth.getUser();
 
   if (userError || !user) {
-    alert("Du må logge inn først.");
+    alert("Du mÃ¥ logge inn fÃ¸rst.");
     return;
   }
 
@@ -281,7 +373,7 @@ photoInput.addEventListener("change", async function() {
     return;
   }
 
-  // Izveido jaunu attēlu galerijā
+  // Izveido jaunu attÄ“lu galerijÄ
 const newPhoto = document.createElement("img");
 
 newPhoto.src = URL.createObjectURL(file);
@@ -306,7 +398,7 @@ deleteButton.style.background = "#c0392b";
 deleteButton.style.marginTop = "12px";
 
 deleteButton.addEventListener("click", function() {
-  if (confirm("Er du sikker på at du vil slette prosjektet?")) {
+  if (confirm("Er du sikker pÃ¥ at du vil slette prosjektet?")) {
     item.remove();
     saveProjects();
   }
@@ -316,7 +408,7 @@ item.appendChild(deleteButton);
 
       const list = document.getElementById("projects");
       if (list.querySelector(".muted")?.textContent ===
-          "Ingen prosjekter lagt til ennå.") {
+          "Ingen prosjekter lagt til ennÃ¥.") {
         list.replaceChildren();
       }
 
@@ -325,7 +417,7 @@ item.appendChild(deleteButton);
       this.reset();
       this.style.display = "none";
     });
- // Saglabā projektus pārlūkprogrammā
+ // SaglabÄ projektus pÄrlÅ«kprogrammÄ
   function saveProjects() {
   const projects = document.getElementById("projects");
 
@@ -363,7 +455,7 @@ item.querySelectorAll("button").forEach(function(button) {
     button.style.marginTop = "12px";
 
     button.addEventListener("click", function() {
-      if (confirm("Er du sikker på at du vil slette prosjektet?")) {
+      if (confirm("Er du sikker pÃ¥ at du vil slette prosjektet?")) {
         item.remove();
         saveProjects();
       }
@@ -429,7 +521,7 @@ function loadProjects() {
           await supabaseClient.auth.getUser();
 
         if (userError || !user) {
-          alert("Du må logge inn først.");
+          alert("Du mÃ¥ logge inn fÃ¸rst.");
           return;
         }
 
@@ -494,3 +586,4 @@ loadProjects();
   </script>
 </body>
 </html>
+
