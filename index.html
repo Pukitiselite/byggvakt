@@ -296,7 +296,7 @@ newPhoto.style.margin = "5px";
 item.insertBefore(newPhoto, photoInput.nextSibling);
 
 saveProjects();
-
+photoInput.value = "";
 alert("Bildet er lagret!");
 }); const deleteButton = document.createElement("button");
 deleteButton.textContent = "Slett prosjekt";
