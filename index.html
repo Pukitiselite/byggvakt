@@ -167,6 +167,24 @@ progressInput.addEventListener("input", function() {
 item.appendChild(progressLabel);
 item.appendChild(progressInput);
 item.appendChild(progressBar);
+      const notesLabel = document.createElement("p");
+notesLabel.textContent = "Notater:";
+
+const notesInput = document.createElement("textarea");
+notesInput.placeholder = "Skriv notater om byggeprosjektet...";
+notesInput.rows = 3;
+notesInput.style.width = "100%";
+notesInput.style.padding = "10px";
+notesInput.style.borderRadius = "8px";
+notesInput.style.border = "1px solid #ccd7d0";
+
+notesInput.addEventListener("input", function() {
+  notesInput.textContent = notesInput.value;
+  saveProjects();
+});
+
+item.appendChild(notesLabel);
+item.appendChild(notesInput);
 
       const list = document.getElementById("projects");
       if (list.querySelector(".muted")?.textContent ===
