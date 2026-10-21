@@ -127,6 +127,23 @@
       const statusText = document.createElement("p");
 statusText.textContent = "Status: " + status;
 item.appendChild(statusText);
+      const statusSelect = document.createElement("select");
+
+["Planlagt", "Pågår", "Ferdig"].forEach(function(value) {
+  const option = document.createElement("option");
+  option.value = value;
+  option.textContent = value;
+  statusSelect.appendChild(option);
+});
+
+statusSelect.value = status;
+
+statusSelect.addEventListener("change", function() {
+  statusText.textContent = "Status: " + statusSelect.value;
+  saveProjects();
+});
+
+item.appendChild(statusSelect);
 
       const list = document.getElementById("projects");
       if (list.querySelector(".muted")?.textContent ===
