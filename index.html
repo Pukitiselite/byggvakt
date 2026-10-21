@@ -219,7 +219,8 @@ function saveProjects() {
 
   projects.querySelectorAll("select").forEach(function(select) {
     select.querySelectorAll("option").forEach(function(option) {
-      if (option.value === select.value) {
+      option.selected = option.value === select.value;
+      if (option.selected) {
         option.setAttribute("selected", "selected");
       } else {
         option.removeAttribute("selected");
@@ -227,17 +228,20 @@ function saveProjects() {
     });
   });
 
+  projects.querySelectorAll("textarea").forEach(function(area) {
+    area.textContent = area.value;
+  });
+
   localStorage.setItem("byggvaktProjects", projects.innerHTML);
 }
-  const projects = document.getElementById("projects").innerHTML;
-  localStorage.setItem("byggvaktProjects", projects);
-}
 
-// Atjauno saglabātos projektus
-function loadProjects() {
-  function addDeleteButtons() {
+function addDeleteButtons() {
   document.querySelectorAll(".project").forEach(function(item) {
-    if (item.querySelector(".delete-project")) return;
+    const existingButton = item.querySelector(".delete-project");
+
+    if (existingButton) {
+      existingButton.remove();
+    }
 
     const button = document.createElement("button");
     button.textContent = "Slett prosjekt";
@@ -256,8 +260,8 @@ function loadProjects() {
     item.appendChild(button);
   });
 }
-  
-   function loadProjects() {
+
+function loadProjects() {
   const saved = localStorage.getItem("byggvaktProjects");
 
   if (saved) {
@@ -274,18 +278,41 @@ function loadProjects() {
         saveProjects();
       });
     }
+
+    const progressInput = item.querySelector('input[type="range"]');
+    const progressBar = item.querySelector("progress");
+
+    if (progressInput) {
+      progressInput.addEventListener("input", function() {
+        const label = Array.from(item.querySelectorAll("p"))
+          .find(p => p.textContent.startsWith("Fremdrift:"));
+
+        if (label) {
+          label.textContent = "Fremdrift: " + progressInput.value + "%";
+        }
+
+        if (progressBar) {
+          progressBar.value = Number(progressInput.value);
+        }
+
+        saveProjects();
+      });
+    }
+
+    const notesInput = item.querySelector("textarea");
+
+    if (notesInput) {
+      notesInput.addEventListener("input", function() {
+        saveProjects();
+      });
+    }
   });
-} 
 
-// Saglabā pēc projekta pievienošanas
-document.getElementById("projectForm").addEventListener("submit", function() {
-  saveProjects();
-});
+  addDeleteButtons();
+}
 
-// Atjauno projektus, atverot lapu
 loadProjects();
-    loadProjects();
-addDeleteButtons();
+
   </script>
 </body>
 </html>
