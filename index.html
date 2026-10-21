@@ -185,7 +185,31 @@ notesInput.addEventListener("input", function() {
 
 item.appendChild(notesLabel);
 item.appendChild(notesInput);
-      const deleteButton = document.createElement("button");
+     // Fotogrāfijas pievienošana
+const photoLabel = document.createElement("p");
+photoLabel.textContent = "Bilder fra byggeplassen:";
+item.appendChild(photoLabel);
+
+const photoInput = document.createElement("input");
+photoInput.type = "file";
+photoInput.accept = "image/*";
+item.appendChild(photoInput);
+
+const photoPreview = document.createElement("img");
+photoPreview.style.width = "100%";
+photoPreview.style.maxWidth = "300px";
+photoPreview.style.marginTop = "10px";
+photoPreview.style.display = "none";
+item.appendChild(photoPreview);
+
+photoInput.addEventListener("change", function() {
+  const file = photoInput.files[0];
+
+  if (file) {
+    photoPreview.src = URL.createObjectURL(file);
+    photoPreview.style.display = "block";
+  }
+}); const deleteButton = document.createElement("button");
 deleteButton.textContent = "Slett prosjekt";
 deleteButton.type = "button";
 deleteButton.className = "button";
