@@ -109,6 +109,7 @@
 
       const name = document.getElementById("projectName").value.trim();
       const address = document.getElementById("projectAddress").value.trim();
+      const status = "Planlagt";
 
       if (!name) return;
 
@@ -123,6 +124,9 @@
       location.className = "muted";
       location.textContent = address || "Ingen adresse oppgitt";
       item.appendChild(location);
+      const statusText = document.createElement("p");
+statusText.textContent = "Status: " + status;
+item.appendChild(statusText);
 
       const list = document.getElementById("projects");
       if (list.querySelector(".muted")?.textContent ===
