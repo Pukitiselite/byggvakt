@@ -281,14 +281,23 @@ photoInput.addEventListener("change", async function() {
     return;
   }
 
-  photoPreview.src = URL.createObjectURL(file);
-  photoPreview.style.display = "block";
+  // Izveido jaunu attēlu galerijā
+const newPhoto = document.createElement("img");
 
-  // Saglabā foto atrašanās vietu projekta kartītē
-  photoPreview.dataset.storagePath = filePath;
-  saveProjects();
+newPhoto.src = URL.createObjectURL(file);
+newPhoto.dataset.storagePath = filePath;
 
-  alert("Bildet er lagret!");
+newPhoto.style.width = "140px";
+newPhoto.style.height = "140px";
+newPhoto.style.objectFit = "cover";
+newPhoto.style.borderRadius = "8px";
+newPhoto.style.margin = "5px";
+
+item.insertBefore(newPhoto, photoInput.nextSibling);
+
+saveProjects();
+
+alert("Bildet er lagret!");
 }); const deleteButton = document.createElement("button");
 deleteButton.textContent = "Slett prosjekt";
 deleteButton.type = "button";
