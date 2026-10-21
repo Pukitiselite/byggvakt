@@ -131,9 +131,31 @@
       }
 
       list.appendChild(item);
+      saveProjects();
       this.reset();
       this.style.display = "none";
     });
+ // Saglabā projektus pārlūkprogrammā
+function saveProjects() {
+  const projects = document.getElementById("projects").innerHTML;
+  localStorage.setItem("byggvaktProjects", projects);
+}
+
+// Atjauno saglabātos projektus
+function loadProjects() {
+  const saved = localStorage.getItem("byggvaktProjects");
+  if (saved) {
+    document.getElementById("projects").innerHTML = saved;
+  }
+}
+
+// Saglabā pēc projekta pievienošanas
+document.getElementById("projectForm").addEventListener("submit", function() {
+  saveProjects();
+});
+
+// Atjauno projektus, atverot lapu
+loadProjects();
   </script>
 </body>
 </html>
