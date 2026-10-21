@@ -169,6 +169,25 @@ function loadProjects() {
     document.getElementById("projects").innerHTML = saved;
   }
 }
+   function loadProjects() {
+  const saved = localStorage.getItem("byggvaktProjects");
+
+  if (saved) {
+    document.getElementById("projects").innerHTML = saved;
+  }
+
+  document.querySelectorAll(".project").forEach(function(item) {
+    const statusSelect = item.querySelector("select");
+    const statusText = item.querySelector("p:not(.muted)");
+
+    if (statusSelect && statusText) {
+      statusSelect.addEventListener("change", function() {
+        statusText.textContent = "Status: " + statusSelect.value;
+        saveProjects();
+      });
+    }
+  });
+} 
 
 // Saglabā pēc projekta pievienošanas
 document.getElementById("projectForm").addEventListener("submit", function() {
