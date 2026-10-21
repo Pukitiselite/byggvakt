@@ -417,6 +417,51 @@ function loadProjects() {
       notesInput.addEventListener("input", function() {
         saveProjects();
       });
+       const { data: { user }, error: userError } =
+      await supabaseClient.auth.getUser();
+
+    if (userError || !user) {
+      alert("Du må logge inn først.");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      alert("Velg en bildefil.");
+      return;
+    }
+
+    const filePath =
+      user.id + "/" + crypto.randomUUID() + "-" +
+      file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+
+    const { error } = await supabaseClient.storage
+      .from("byggvakt-bilder")
+      .upload(filePath, file, {
+        contentType: file.type
+      });
+
+    if (error) {
+      alert("Kunne ikke laste opp bildet: " + error.message);
+      return;
+    }
+
+    const newPhoto = document.createElement("img");
+    newPhoto.src = URL.createObjectURL(file);
+    newPhoto.dataset.storagePath = filePath;
+    newPhoto.style.width = "140px";
+    newPhoto.style.height = "140px";
+    newPhoto.style.objectFit = "cover";
+    newPhoto.style.borderRadius = "8px";
+    newPhoto.style.margin = "5px";
+
+    item.insertBefore(newPhoto, photoInput.nextSibling);
+
+    saveProjects();
+    photoInput.value = "";
+
+    alert("Bildet er lagret!");
+  });
+}
     }
   });
 document.querySelectorAll(".project img[data-storage-path]").forEach(
