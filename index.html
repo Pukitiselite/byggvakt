@@ -128,6 +128,30 @@ $("search").addEventListener("input",render);$("filter").addEventListener("chang
 $("export").addEventListener("click",()=>{const blob=new Blob([JSON.stringify({format:"byggvakt-projects-v2",exportedAt:new Date().toISOString(),projects},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="byggvakt-backup-"+new Date().toISOString().slice(0,10)+".json";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)});
 $("toggleAuth").addEventListener("click",()=>{const box=$("authContent");if(box.classList.contains("hidden"))showAuthForm("loginForm");else box.classList.add("hidden")});
 $("forgotButton").addEventListener("click",()=>{$("recoveryEmail").value=$("loginEmail").value;showAuthForm("forgotForm");authMessage("")});
+  $("signupButton").addEventListener("click",async()=>{
+  const email=$("loginEmail").value.trim();
+  const password=$("loginPassword").value;
+  if(!email||!password){
+    authMessage("Skriv inn e-post og passord først.");
+    return;
+  }
+  if(password.length<8){
+    authMessage("Passordet må ha minst 8 tegn.");
+    return;
+  }
+  if(!sb){
+    authMessage("Registrering er ikke tilgjengelig.");
+    return;
+  }
+  try{
+    authMessage("Oppretter konto...");
+    const {error}=await sb.auth.signUp({email,password});
+    if(error)throw error;
+    authMessage("Sjekk e-posten din og bekreft kontoen.");
+  }catch(err){
+    authMessage("Registrering feilet: "+err.message);
+  }
+});
 $("backLogin").addEventListener("click",()=>{showAuthForm("loginForm");authMessage("")});
 $("loginForm").addEventListener("submit",async e=>{e.preventDefault();if(!sb){authMessage(t("error")+"Supabase unavailable");return}const btn=e.currentTarget.querySelector("button[type=submit]");btn.disabled=true;authMessage(t("loading"));try{const {error}=await sb.auth.signInWithPassword({email:$("loginEmail").value.trim(),password:$("loginPassword").value});if(error)throw error;$("loginPassword").value="";authMessage(t("loginOk"))}catch(err){authMessage(t("loginError")+err.message)}finally{btn.disabled=false}});
 $("forgotForm").addEventListener("submit",async e=>{e.preventDefault();if(!sb)return;const btn=e.currentTarget.querySelector("button[type=submit]");btn.disabled=true;authMessage(t("loading"));try{const {error}=await sb.auth.resetPasswordForEmail($("recoveryEmail").value.trim(),{redirectTo:location.origin+location.pathname});if(error)throw error;authMessage(t("sent"))}catch(err){authMessage(/rate limit|too many|over_email_send_rate_limit/i.test(err.message)?t("rate"):t("error")+err.message)}finally{btn.disabled=false}});
