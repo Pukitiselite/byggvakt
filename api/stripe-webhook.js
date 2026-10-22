@@ -1,18 +1,20 @@
+
 const Stripe = require("stripe");
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const SUPABASE_URL = "https://fzsxqcqkzxrfxoirfmyh.supabase.co";
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const secretKey = process.env.STRIPE_SECRET_KEY;
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-  if (!secretKey || !webhookSecret) {
-    return res.status(503).json({ error: "Stripe is not configured" });
+  if (!process.env.STRIPE_WEBHOOK_SECRET ||
+      !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return res.status(503).json({ error: "Server not configured" });
   }
 
-  const stripe = new Stripe(secretKey);
+  let event;
 
   try {
     const chunks = [];
@@ -20,21 +22,18 @@ module.exports = async function handler(req, res) {
       chunks.push(Buffer.from(chunk));
     }
 
-    const rawBody = Buffer.concat(chunks);
-    const signature = req.headers["stripe-signature"];
-
-    stripe.webhooks.constructEvent(
-      rawBody,
-      signature,
-      webhookSecret
+    event = stripe.webhooks.constructEvent(
+      Buffer.concat(chunks),
+      req.headers["stripe-signature"],
+      process.env.STRIPE_WEBHOOK_SECRET
     );
-
-    return res.status(503).json({
-      error: "Subscription processing is not configured yet"
-    });
-  } catch (error) {
-    return res.status(400).json({
-      error: "Webhook verification failed"
-    });
+  } catch (err) {
+    return res.status(400).json({ error: "Invalid Stripe signature" });
   }
+
+  // Subscription processing will be added next.
+  // Do not acknowledge events until processing is implemented.
+  return res.status(503).json({
+    error: "Subscription processing not configured"
+  });
 };
