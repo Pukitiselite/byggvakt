@@ -55,7 +55,7 @@ textarea{min-height:105px;resize:vertical}label{display:block;font-weight:650;fo
 <body>
 <header><div class="shell topbar"><div><div class="brand">🏗️ Byggvakt AI</div><div class="tagline" data-i18n="tagline">Enkel oversikt over byggeprosjekter</div></div><div class="header-actions"><span id="userPill" class="user-pill"></span><select id="language" class="lang" aria-label="Language"><option value="no">Norsk</option><option value="en">English</option></select><button id="logout" class="btn secondary smallbtn hidden" data-i18n="logout">Logg ut</button></div></div></header>
 <main class="shell">
-<div class="intro"><div><h1 data-i18n="dashboard">Prosjektoversikt</h1><p class="muted" data-i18n="subtitle">Status, fremdrift, notater og bilder pÃ¥ ett sted.</p></div><button id="newProject" class="btn" data-i18n="add">+ Nytt prosjekt</button></div>
+<div class="intro"><div><h1 data-i18n="dashboard">Prosjektoversikt</h1><p class="muted" data-i18n="subtitle">Status, fremdrift, notater og bilder på ett sted.</p></div><button id="newProject" class="btn" data-i18n="add">+ Nytt prosjekt</button></div>
 <section class="stats" aria-label="Statistics"><div class="card stat"><div class="value" id="statTotal">0</div><div class="label" data-i18n="all">Alle prosjekter</div></div><div class="card stat"><div class="value" id="statPlanned">0</div><div class="label" data-i18n="planned">Planlagt</div></div><div class="card stat"><div class="value" id="statActive">0</div><div class="label" data-i18n="active">PÃ¥gÃ¥r</div></div><div class="card stat"><div class="value" id="statDone">0</div><div class="label" data-i18n="done">Ferdig</div></div></section>
 <section class="card auth-panel" id="authPanel"><div class="auth-row"><div><h2 style="margin-bottom:3px" data-i18n="account">Konto og bilder</h2><div class="hint" id="authHint" data-i18n="authHint">Logg inn for Ã¥ laste opp bilder til Supabase.</div></div><button class="btn secondary smallbtn" id="toggleAuth" data-i18n="login">Logg inn</button></div>
 <div id="authContent" class="auth-form hidden">
@@ -69,14 +69,14 @@ textarea{min-height:105px;resize:vertical}label{display:block;font-weight:650;fo
 <p class="muted" data-i18n="aiIntro">Last opp et bilde av en skade og fÃ¥ forslag til utbedring og nÃ¸dvendige materialer.</p>
 <div class="field"><label for="aiImage" data-i18n="aiChoose">Velg bilde av skaden</label><input id="aiImage" type="file" accept="image/jpeg,image/png,image/webp"></div>
 <div class="field"><label for="aiContext" data-i18n="aiContext">Beskriv problemet (valgfritt)</label><textarea id="aiContext" maxlength="1200" data-placeholder="aiExample" placeholder="For eksempel: sprekk i innvendig vegg"></textarea></div>
-<p class="hint" data-i18n="aiPrivacy">Bildet sendes til AI-tjenesten bare nÃ¥r du trykker Analyser. Krever innlogging. Maks 5 MB.</p>
+<p class="hint" data-i18n="aiPrivacy">Bildet sendes til AI-tjenesten bare når du trykker Analyser. Krever innlogging. Maks 5 MB.</p>
 <button id="aiAnalyze" type="button" class="btn" data-i18n="aiButton">Analyser skade</button>
 <p id="aiMessage" class="message" role="status" aria-live="polite"></p>
 <div id="aiResult" class="ai-result hidden" aria-live="polite"></div>
 <p class="hint" data-i18n="aiWarning">AI kan ta feil. Ved bÃ¦rende konstruksjoner, strÃ¸m, gass, asbest eller alvorlig fukt: kontakt fagperson fÃ¸r arbeid.</p>
 </section>
 <section id="projects" class="project-grid" aria-label="Projects"></section>
-<div class="footer"><p data-i18n="localInfo">Prosjekter og notater lagres i denne nettleseren. Bilder lagres i Supabase nÃ¥r du er innlogget. Bruk eksport for sikkerhetskopi.</p><p data-i18n="aiInfo">AI-rÃ¥d er veiledende og erstatter ikke en faglig befaring.</p></div>
+<div class="footer"><p data-i18n="localInfo">Prosjekter og notater lagres i denne nettleseren. Bilder lagres i Supabase når du er innlogget. Bruk eksport for sikkerhetskopi.</p><p data-i18n="aiInfo">AI-rÃ¥d er veiledende og erstatter ikke en faglig befaring.</p></div>
 </main>
 <dialog id="projectDialog" class="dialog"><div class="dialog-body"><div class="dialog-head"><h2 id="dialogTitle" data-i18n="newProject">Nytt prosjekt</h2><button id="closeDialog" class="close" type="button" aria-label="Close">Ã—</button></div>
 <form id="editor"><div class="field"><label for="projectName" data-i18n="name">Prosjektnavn</label><input id="projectName" maxlength="140" required></div><div class="field"><label for="projectAddress" data-i18n="address">Adresse</label><input id="projectAddress" maxlength="250"></div>
