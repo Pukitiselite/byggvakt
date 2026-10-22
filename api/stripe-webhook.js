@@ -31,9 +31,18 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: "Invalid Stripe signature" });
   }
 
-  // Subscription processing will be added next.
-  // Do not acknowledge events until processing is implemented.
+  
+const obj = event.data.object;
+
+  if (event.type === "checkout.session.completed") {
+    console.log("Stripe checkout completed:", obj.id);
+  } else if (event.type.startsWith("customer.subscription.")) {
+    console.log("Stripe subscription event:", event.type);
+  } else if (event.type.startsWith("invoice.payment_")) {
+    console.log("Stripe invoice event:", event.type);
+  }
+
   return res.status(503).json({
-    error: "Subscription processing not configured"
+    error: "Subscription database sync not implemented yet"
   });
 };
