@@ -29,7 +29,56 @@ module.exports = async function handler(req, res) {
     if (!user.id) {
       return res.status(401).json({ error: "Invalid user" });
     }
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+if (!serviceKey) {
+  return res.status(503).json({
+    error: "Subscription verification is not configured"
+  });
+}
+
+const subscriptionUrl = new URL(
+  `${SUPABASE_URL}/rest/v1/subscriptions`
+);
+
+subscriptionUrl.searchParams.set("user_id", `eq.${user.id}`);
+subscriptionUrl.searchParams.set(
+  "select",
+  "status,current_period_end"
+);
+
+const subscriptionResponse = await fetch(subscriptionUrl, {
+  headers: {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`
+  }
+});
+
+if (!subscriptionResponse.ok) {
+  return res.status(503).json({
+    error: "Could not verify subscription"
+  });
+}
+
+const subscriptions = await subscriptionResponse.json();
+const subscription = subscriptions[0];
+
+if (
+  !subscription ||
+  !["active", "trialing"].includes(subscription.status)
+) {
+  return res.status(403).json({
+    error: "Active subscription required — 245 NOK/month"
+  });
+}
+ if (
+  subscription.current_period_end &&
+  new Date(subscription.current_period_end).getTime() <= Date.now()
+) {
+  return res.status(403).json({
+    error: "Subscription has expired"
+  });
+}   
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return res.status(503).json({ error: "OPENAI_API_KEY is not configured" });
