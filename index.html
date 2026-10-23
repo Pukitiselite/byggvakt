@@ -201,7 +201,36 @@ $("aiAnalyze").addEventListener("click",async()=>{
   }catch(err){message.textContent=t("aiError")+err.message}
   finally{button.disabled=false}
 });
-$("subscribeButton").addEventListener("click", () => {
+$("subscribeButton").addEventListener("click", async () => {
+  const button = $("subscribeButton");
+  button.disabled = true;
+
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+
+    if (!session?.access_token) {
+      throw new Error("Logg inn først.");
+    }
+
+    const response = await fetch("/api/create-checkout", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + session.access_token
+      }
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.url) {
+      throw new Error(data.error || "Kunne ikke starte betaling.");
+    }
+
+    window.location.href = data.url;
+  } catch (err) {
+    alert(err.message);
+    button.disabled = false;
+  }
+});
   if (!user) {
     alert("Logg inn før du starter abonnementet.");
     return;
