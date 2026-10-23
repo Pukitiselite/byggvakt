@@ -231,17 +231,15 @@ $("subscribeButton").addEventListener("click", async () => {
     button.disabled = false;
   }
 });
-  if (!user) {
-    alert("Logg inn før du starter abonnementet.");
-    return;
+  } catch (err) {
+    alert(err.message);
+    button.disabled = false;
   }
-
-  const paymentUrl = new URL(
-    "https://buy.stripe.com/test_9B628r2qNeOY6uV5MR2ZO00"
-  );
-  paymentUrl.searchParams.set("client_reference_id", user.id);
-  window.location.href = paymentUrl.toString();
 });
+
+load();applyLanguage();updateAuth();
+</script>
+</body></html>
 load();applyLanguage();updateAuth();
 </script>
 </body></html>
