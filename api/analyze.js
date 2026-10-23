@@ -78,7 +78,28 @@ if (
   return res.status(403).json({
     error: "Subscription has expired"
   });
-}   
+}  
+   if (!subscriptionResponse.ok) {
+  return res.status(503).json({
+    error: "Could not verify subscription"
+  });
+}
+
+const subscriptions = await subscriptionResponse.json();
+const subscription = subscriptions[0];
+
+if (
+  !subscription ||
+  !["active", "trialing"].includes(subscription.status) ||
+  (
+    subscription.current_period_end &&
+    new Date(subscription.current_period_end).getTime() <= Date.now()
+  )
+) {
+  return res.status(403).json({
+    error: "Active subscription required — 245 NOK/month"
+  });
+} 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return res.status(503).json({ error: "OPENAI_API_KEY is not configured" });
