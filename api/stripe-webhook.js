@@ -46,3 +46,8 @@ const obj = event.data.object;
     error: "Subscription database sync not implemented yet"
   });
 };
+module.exports.config = {
+  api: {
+    bodyParser: false
+  }
+};
