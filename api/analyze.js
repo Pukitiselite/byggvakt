@@ -9,143 +9,166 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const token = (req.headers.authorization || "").match(/^Bearer (.+)$/i)?.[1];
+    const token = (req.headers.authorization || "")
+      .match(/^Bearer (.+)$/i)?.[1];
+
     if (!token) {
-      return res.status(401).json({ error: "Sign-in required" });
+      return res.status(401).json({
+        error: "Sign-in required"
+      });
     }
 
-    const authResponse = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${token}`
+    // Verify the logged-in Supabase user
+    const authResponse = await fetch(
+      `${SUPABASE_URL}/auth/v1/user`,
+      {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${token}`
+        }
       }
-    });
+    );
 
     if (!authResponse.ok) {
-      return res.status(401).json({ error: "Invalid or expired session" });
+      return res.status(401).json({
+        error: "Invalid or expired session"
+      });
     }
 
     const user = await authResponse.json();
+
     if (!user.id) {
-      return res.status(401).json({ error: "Invalid user" });
+      return res.status(401).json({
+        error: "Invalid user"
+      });
     }
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!serviceKey) {
-  return res.status(503).json({
-    error: "Subscription verification is not configured"
-  });
-}
+    // Verify the user's paid subscription
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const subscriptionUrl = new URL(
-  `${SUPABASE_URL}/rest/v1/subscriptions`
-);
+    if (!serviceKey) {
+      return res.status(503).json({
+        error: "Subscription verification is not configured"
+      });
+    }
 
-subscriptionUrl.searchParams.set("user_id", `eq.${user.id}`);
-subscriptionUrl.searchParams.set(
-  "select",
-  "status,current_period_end"
-);
+    const subscriptionUrl = new URL(
+      `${SUPABASE_URL}/rest/v1/subscriptions`
+    );
 
-const subscriptionResponse = await fetch(subscriptionUrl, {
-  headers: {
-    apikey: serviceKey,
-    Authorization: `Bearer ${serviceKey}`
-  }
-});
+    subscriptionUrl.searchParams.set(
+      "user_id",
+      `eq.${user.id}`
+    );
 
-if (!subscriptionResponse.ok) {
-  return res.status(503).json({
-    error: "Could not verify subscription"
-  });
-}
+    subscriptionUrl.searchParams.set(
+      "select",
+      "status,current_period_end"
+    );
 
-const subscriptions = await subscriptionResponse.json();
-const subscription = subscriptions[0];
+    const subscriptionResponse = await fetch(
+      subscriptionUrl,
+      {
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`
+        }
+      }
+    );
 
-if (
-  !subscription ||
-  !["active", "trialing"].includes(subscription.status)
-) {
-  return res.status(403).json({
-    error: "Active subscription required — 245 NOK/month"
-  });
-}
- if (
-  subscription.current_period_end &&
-  new Date(subscription.current_period_end).getTime() <= Date.now()
-) {
-  return res.status(403).json({
-    error: "Subscription has expired"
-  });
-}  
-   if (!subscriptionResponse.ok) {
-  return res.status(503).json({
-    error: "Could not verify subscription"
-  });
-}
+    if (!subscriptionResponse.ok) {
+      return res.status(503).json({
+        error: "Could not verify subscription"
+      });
+    }
 
-const subscriptions = await subscriptionResponse.json();
-const subscription = subscriptions[0];
+    const subscriptions = await subscriptionResponse.json();
+    const subscription = subscriptions[0];
 
-if (
-  !subscription ||
-  !["active", "trialing"].includes(subscription.status) ||
-  (
-    subscription.current_period_end &&
-    new Date(subscription.current_period_end).getTime() <= Date.now()
-  )
-) {
-  return res.status(403).json({
-    error: "Active subscription required — 245 NOK/month"
-  });
-} 
+    if (
+      !subscription ||
+      !["active", "trialing"].includes(subscription.status)
+    ) {
+      return res.status(403).json({
+        error: "Active subscription required — 245 NOK/month"
+      });
+    }
+
+    // Check subscription expiration
+    if (
+      subscription.current_period_end &&
+      (
+        !Number.isFinite(
+          Date.parse(subscription.current_period_end)
+        ) ||
+        Date.parse(subscription.current_period_end) <= Date.now()
+      )
+    ) {
+      return res.status(403).json({
+        error: "Subscription has expired"
+      });
+    }
+
+    // Verify OpenAI configuration
     const apiKey = process.env.OPENAI_API_KEY;
+
     if (!apiKey) {
-      return res.status(503).json({ error: "OPENAI_API_KEY is not configured" });
+      return res.status(503).json({
+        error: "OPENAI_API_KEY is not configured"
+      });
     }
 
     const { image, context, language } = req.body || {};
 
+    // Validate the uploaded image
     if (
       typeof image !== "string" ||
       !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(image) ||
       image.length > 7_500_000
     ) {
-      return res.status(400).json({ error: "Invalid image or image too large" });
+      return res.status(400).json({
+        error: "Invalid image or image too large"
+      });
     }
 
     const instructions = language === "en"
       ? "Analyze visible construction damage. Describe observations, possible causes, safe repair suggestions and likely materials. Explain uncertainties. Recommend a qualified professional for structural, electrical, gas, asbestos or serious moisture risks. Do not claim certainty from a photograph."
       : "Analyser synlige byggskader på norsk. Beskriv observasjoner, mulige årsaker, trygge forslag til utbedring og aktuelle materialer. Forklar usikkerhet. Anbefal fagperson ved bærende konstruksjoner, strøm, gass, asbest eller alvorlige fuktskader. Ikke trekk sikre konklusjoner fra bare et fotografi.";
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4.1-mini",
-        instructions,
-        input: [{
-          role: "user",
-          content: [
+    // Request AI image analysis
+    const response = await fetch(
+      "https://api.openai.com/v1/responses",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "gpt-4.1-mini",
+          instructions,
+          input: [
             {
-              type: "input_text",
-              text: typeof context === "string" && context.trim()
-                ? context.slice(0, 1200)
-                : "Analyze this construction damage photo."
-            },
-            {
-              type: "input_image",
-              image_url: image
+              role: "user",
+              content: [
+                {
+                  type: "input_text",
+                  text:
+                    typeof context === "string" && context.trim()
+                      ? context.slice(0, 1200)
+                      : "Analyze this construction damage photo."
+                },
+                {
+                  type: "input_image",
+                  image_url: image
+                }
+              ]
             }
-          ]
-        }],
-        max_output_tokens: 800
-      })
-    });
+          ],
+          max_output_tokens: 800
+        })
+      }
+    );
 
     const data = await response.json();
 
@@ -164,9 +187,12 @@ if (
     return res.status(200).json({
       analysis: analysis || "No analysis returned."
     });
+
   } catch (err) {
+    console.error("Analysis error:", err);
+
     return res.status(500).json({
-      error: "Analysis failed: " + err.message
+      error: "Analysis failed"
     });
   }
 };
