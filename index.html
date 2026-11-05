@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="no">
 <head>
@@ -65,7 +66,8 @@ textarea{min-height:105px;resize:vertical}label{display:block;font-weight:650;fo
 <p id="authMessage" class="message" role="status" aria-live="polite"></p></div></section>
   <section class="card" style="margin-bottom:20px">
   <h2>Byggvakt AI abonnement</h2>
-  <p>245 kr per måned</p>
+  <p id="subPrice">245 kr per måned</p>
+  <p id="subStatus" class="message" role="status" aria-live="polite"></p>
   <button id="subscribeButton" class="btn" type="button">
     Start abonnement
   </button>
@@ -123,7 +125,7 @@ function node(tag,cls,txt){const el=document.createElement(tag);if(cls)el.classN
 function render(){const counts={Planlagt:0,"Pågår":0,Ferdig:0};projects.forEach(p=>counts[p.status]++);$("statTotal").textContent=projects.length;$("statPlanned").textContent=counts.Planlagt;$("statActive").textContent=counts["Pågår"];$("statDone").textContent=counts.Ferdig;const term=$("search").value.trim().toLocaleLowerCase(),filter=$("filter").value;const found=projects.filter(p=>(filter==="all"||p.status===filter)&&(!term||(p.name+" "+p.address+" "+p.notes).toLocaleLowerCase().includes(term)));$("projects").replaceChildren();if(!found.length){$("projects").append(node("div","empty",t("empty")));return}for(const p of found){const card=node("article","card project-card"),head=node("div","project-head"),details=node("div"),title=node("div","project-title",p.name),address=node("div","address",p.address||t("noAddress"));details.append(title,address);const chip=node("span","chip"+(p.status==="Pågår"?" active":p.status==="Ferdig"?" done":""),t(p.status==="Pågår"?"active":p.status==="Ferdig"?"done":"planned"));head.append(details,chip);card.append(head);const progress=node("div"),caption=node("div","progress-caption");caption.append(node("span","",t("progress")),node("strong","",p.progress+"%"));const track=node("div","progress-track"),fill=node("div","progress-fill");fill.style.width=p.progress+"%";track.append(fill);progress.append(caption,track);card.append(progress);if(p.notes){const preview=node("p","muted small",p.notes.length>120?p.notes.slice(0,120)+"…":p.notes);preview.style.whiteSpace="pre-wrap";card.append(preview)}const bottom=node("div","card-bottom"),photoText=node("span","small muted",`📷 ${p.photos.length} ${lang==="no"&&p.photos.length===1?"bilde":t("photosCount")}`),open=node("button","btn secondary smallbtn",t("open"));open.type="button";open.addEventListener("click",()=>openEditor(p.id));bottom.append(photoText,open);card.append(bottom);$("projects").append(card)}}
 function openEditor(id=null){currentId=id;const p=projects.find(x=>x.id===id);$("editor").reset();$("projectName").value=p?.name||"";$("projectAddress").value=p?.address||"";$("projectStatus").value=p?.status||"Planlagt";$("projectProgress").value=p?.progress||0;$("progressValue").textContent=$("projectProgress").value+"%";$("projectNotes").value=p?.notes||"";$("deleteProject").classList.toggle("hidden",!p);$("dialogTitle").textContent=t(p?"editProject":"newProject");$("photoMessage").textContent="";renderGallery();$("projectDialog").showModal()}
 function renderGallery(){const gallery=$("gallery");gallery.replaceChildren();const p=projects.find(x=>x.id===currentId);if(!p)return;for(const path of p.photos){const wrap=node("div","photo"),img=node("img");img.alt=t("photos");img.loading="lazy";wrap.append(img);const del=node("button","","×");del.type="button";del.setAttribute("aria-label",t("delete"));del.addEventListener("click",()=>{if(!confirm(t("deleteConfirm")))return;p.photos=p.photos.filter(x=>x!==path);save();renderGallery();render()});wrap.append(del);gallery.append(wrap);if(sb&&user){sb.storage.from(BUCKET).createSignedUrl(path,3600).then(({data,error})=>{if(!error&&data&&img.isConnected)img.src=data.signedUrl}).catch(console.error)}}}
-function updateAuth(){const logged=!!user;$("userPill").textContent=user?.email||"";$("logout").classList.toggle("hidden",!logged);$("toggleAuth").classList.toggle("hidden",logged);$("authHint").textContent=user?.email||t("authHint");if(logged&&!recoveryMode)$("authContent").classList.add("hidden");if(recoveryMode)showAuthForm("resetForm")}
+function updateAuth(){const logged=!!user;$("userPill").textContent=user?.email||"";$("logout").classList.toggle("hidden",!logged);$("toggleAuth").classList.toggle("hidden",logged);$("authHint").textContent=user?.email||t("authHint");if(logged&&!recoveryMode)$("authContent").classList.add("hidden");if(recoveryMode)showAuthForm("resetForm");refreshSubscription()}
 function showAuthForm(form){$("authContent").classList.remove("hidden");for(const id of ["loginForm","forgotForm","resetForm"])$(id).classList.toggle("hidden",id!==form)}
 function authMessage(msg){$("authMessage").textContent=msg}
 $("language").addEventListener("change",e=>{lang=e.target.value;localStorage.setItem("byggvaktLanguage",lang);applyLanguage()});
@@ -201,11 +203,61 @@ $("aiAnalyze").addEventListener("click",async()=>{
   }catch(err){message.textContent=t("aiError")+err.message}
   finally{button.disabled=false}
 });
+// Checks the subscription on the server and shows/hides the subscribe button
+let subTimer = null;
+let subChecks = 0;
+async function refreshSubscription() {
+  const button = $("subscribeButton"), statusEl = $("subStatus");
+  if (!button || !statusEl) return;
+
+  const justPaid = new URLSearchParams(location.search).get("payment") === "success";
+
+  if (!sb || !user) {
+    button.classList.remove("hidden");
+    statusEl.textContent = justPaid ? "Betalingen er mottatt. Logg inn for å se abonnementet." : "";
+    return;
+  }
+
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session?.access_token) return;
+
+    const response = await fetch("/api/subscription-status", {
+      headers: { "Authorization": "Bearer " + session.access_token }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "HTTP " + response.status);
+
+    if (data.active) {
+      button.classList.add("hidden");
+      const end = data.current_period_end ? new Date(data.current_period_end).toLocaleDateString("nb-NO") : "";
+      statusEl.textContent = "✅ Abonnementet er aktivt" + (end ? " (neste fornyelse: " + end + ")" : "") + ".";
+      clearTimeout(subTimer);
+    } else {
+      button.classList.remove("hidden");
+      if (justPaid && subChecks < 6) {
+        // The webhook may take a few seconds: check again
+        statusEl.textContent = "Betalingen er mottatt. Aktiverer abonnementet …";
+        subChecks++;
+        clearTimeout(subTimer);
+        subTimer = setTimeout(refreshSubscription, 3000);
+      } else {
+        statusEl.textContent = "";
+      }
+    }
+  } catch (err) {
+    console.error(err);
+    button.classList.remove("hidden");
+    statusEl.textContent = "Kunne ikke kontrollere abonnementet akkurat nå.";
+  }
+}
+
 $("subscribeButton").addEventListener("click", async () => {
   const button = $("subscribeButton");
   button.disabled = true;
 
   try {
+    if (!sb) throw new Error("Innlogging er ikke tilgjengelig.");
     const { data: { session } } = await sb.auth.getSession();
 
     if (!session?.access_token) {
