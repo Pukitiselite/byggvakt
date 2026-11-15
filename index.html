@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="no">
 <head>
@@ -87,6 +88,15 @@ input[type=file]::file-selector-button{font:inherit;font-weight:650;margin-right
 <button id="aiAnalyze" type="button" class="btn" data-i18n="aiButton">Analyser skade</button>
 <p id="aiMessage" class="message" role="status" aria-live="polite"></p>
 <div id="aiResult" class="ai-result hidden" aria-live="polite"></div>
+<div id="aiSavePanel" class="hidden" style="margin-top:14px">
+  <button id="aiSaveToggle" type="button" class="btn secondary">Lagre i prosjekt</button>
+  <div id="aiSaveOptions" class="hidden" style="margin-top:14px">
+    <div class="field"><label for="aiTargetProject">Velg prosjekt</label><select id="aiTargetProject"></select></div>
+    <div id="aiNewProjectField" class="field hidden"><label for="aiNewProjectName">Navn på nytt prosjekt</label><input id="aiNewProjectName" maxlength="140" placeholder="Prosjektnavn"></div>
+    <button id="aiSaveConfirm" type="button" class="btn">Lagre bilde og analyse</button>
+    <p id="aiSaveMessage" class="message" role="status" aria-live="polite"></p>
+  </div>
+</div>
 <p class="hint" data-i18n="aiWarning">AI kan ta feil. Ved bærende konstruksjoner, strøm, gass, asbest eller alvorlig fukt: kontakt fagperson før arbeid.</p>
 </section>
 <div class="footer"><p data-i18n="localInfo">Når du er innlogget, lagres prosjekter, notater og bilder trygt i skyen og er tilgjengelige på alle enhetene dine. Uten innlogging lagres de bare i denne nettleseren. Bruk eksport for sikkerhetskopi.</p><p data-i18n="aiInfo">AI-råd er veiledende og erstatter ikke en faglig befaring.</p></div>
@@ -218,8 +228,64 @@ $("logout").addEventListener("click",async()=>{if(!sb)return;const {error}=await
 $("photoInput").addEventListener("change",async e=>{const files=[...e.target.files];e.target.value="";if(!files.length)return;if(!sb||!user){$("photoMessage").textContent=t("needLogin");return}const p=projects.find(x=>x.id===currentId);if(!p){$("photoMessage").textContent=t("save")+" "+t("newProject");return}for(const file of files){if(!file.type.startsWith("image/")||file.size>20*1024*1024){$("photoMessage").textContent=t("invalidImage");continue}const path=user.id+"/"+uuid()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_").slice(-100);$("photoMessage").textContent=t("loading");try{const {error}=await sb.storage.from(BUCKET).upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;p.photos.push(path);save();renderGallery();render();await syncProject(p);$("photoMessage").textContent=t("uploaded")}catch(err){$("photoMessage").textContent=t("uploadError")+err.message}}});
 if(sb){sb.auth.onAuthStateChange((event,session)=>{user=session?.user||null;if(event==="PASSWORD_RECOVERY"){recoveryMode=true;showAuthForm("resetForm");authMessage(t("recovery"))}updateAuth()});sb.auth.getSession().then(({data})=>{user=data.session?.user||null;updateAuth()}).catch(console.error)}
 
+// Save the most recently analyzed photo and report to an existing or new project.
+let analyzedPhoto=null;
+function refreshAiProjectChoices(){
+  const select=$("aiTargetProject");select.replaceChildren();
+  for(const p of projects){const opt=document.createElement("option");opt.value=p.id;opt.textContent=p.name;select.append(opt)}
+  const newOption=document.createElement("option");newOption.value="__new__";newOption.textContent=lang==="en"?"+ Create new project":"+ Opprett nytt prosjekt";select.append(newOption);
+  select.value=projects.length?projects[0].id:"__new__";
+  $("aiNewProjectField").classList.toggle("hidden",select.value!=="__new__");
+}
+$("aiTargetProject").addEventListener("change",()=>$("aiNewProjectField").classList.toggle("hidden",$("aiTargetProject").value!=="__new__"));
+$("aiSaveToggle").addEventListener("click",()=>{
+  if(!user||!cloudReady)return;
+  refreshAiProjectChoices();$("aiSaveMessage").textContent="";
+  $("aiSaveOptions").classList.toggle("hidden");
+});
+$("aiImage").addEventListener("change",()=>{
+  analyzedPhoto=null;$("aiSavePanel").classList.add("hidden");$("aiSaveOptions").classList.add("hidden");
+});
+$("aiSaveConfirm").addEventListener("click",async()=>{
+  const msg=$("aiSaveMessage"),btn=$("aiSaveConfirm");
+  if(!user||!cloudReady||!sb||!analyzedPhoto||!$("aiResult").textContent.trim()){
+    msg.textContent="Logg inn og analyser et bilde først.";return;
+  }
+  const target=$("aiTargetProject").value,isNew=target==="__new__";
+  const name=$("aiNewProjectName").value.trim();
+  if(isNew&&!name){msg.textContent="Skriv inn prosjektnavn.";return}
+  const existing=isNew?null:projects.find(p=>p.id===target);
+  if(!isNew&&!existing){msg.textContent="Prosjektet ble ikke funnet.";return}
+  const file=analyzedPhoto.file;
+  if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>20*1024*1024){msg.textContent=t("aiInvalid");return}
+  btn.disabled=true;msg.textContent="Lagrer bilde og analyse …";
+  let path=null;
+  try{
+    // Store photos in the signed-in user's folder, as required by Storage RLS.
+    path=user.id+"/"+uuid()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_").slice(-100);
+    const {error:uploadError}=await sb.storage.from(BUCKET).upload(path,file,{contentType:file.type,upsert:false});
+    if(uploadError)throw uploadError;
+    const p=isNew?cleanProject({id:uuid(),name,photos:[],notes:""}):existing;
+    const stamp=new Date().toLocaleString(lang==="en"?"en-GB":"nb-NO");
+    const entry="AI bildeanalyse ("+stamp+")\n"+analyzedPhoto.analysis;
+    const updated={...p,notes:p.notes?p.notes+"\n\n---\n\n"+entry:entry,photos:[...p.photos,path]};
+    // Commit to Supabase before updating the UI; do not overwrite existing notes/photos.
+    const {error:saveError}=await sb.from("projects").upsert(toRow(updated,user.id));
+    if(saveError)throw saveError;
+    if(isNew)projects.unshift(updated);else Object.assign(existing,updated);
+    render();msg.textContent=isNew?"Nytt prosjekt opprettet. Bilde og analyse lagret.":"Bilde og analyse lagret i prosjektet.";
+    $("aiSaveConfirm").disabled=true;
+    analyzedPhoto=null;
+  }catch(err){
+    msg.textContent="Kunne ikke lagre: "+err.message;
+    // If the project write failed, remove the just-uploaded unreferenced photo.
+    if(path)try{await sb.storage.from(BUCKET).remove([path])}catch(e){console.error(e)}
+  }finally{if(analyzedPhoto)btn.disabled=false}
+});
+
 $("aiAnalyze").addEventListener("click",async()=>{
   const file=$("aiImage").files[0], message=$("aiMessage"), result=$("aiResult"), button=$("aiAnalyze");
+  analyzedPhoto=null;$("aiSavePanel").classList.add("hidden");$("aiSaveOptions").classList.add("hidden");
   result.classList.add("hidden");result.textContent="";
   if(!sb||!user){message.textContent=t("aiNeedLogin");return}
   if(!file||!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>20*1024*1024){message.textContent=t("aiInvalid");return}
@@ -249,6 +315,7 @@ $("aiAnalyze").addEventListener("click",async()=>{
     const data=await response.json();
     if(!response.ok)throw new Error(data.error||"HTTP "+response.status);
     result.textContent=data.analysis||"";result.classList.remove("hidden");message.textContent="";
+    if(result.textContent.trim()){analyzedPhoto={file,analysis:result.textContent};$("aiSavePanel").classList.remove("hidden");}
   }catch(err){message.textContent=t("aiError")+err.message}
   finally{button.disabled=false}
 });
