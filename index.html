@@ -50,7 +50,7 @@ textarea{min-height:105px;resize:vertical}label{display:block;font-weight:650;fo
 .auth-buttons{display:flex;gap:9px;flex-wrap:wrap;align-items:center}.message{min-height:20px;font-size:14px;margin-top:8px;white-space:pre-wrap}
 input[type=range]{accent-color:var(--green)}
 input[type=file]::file-selector-button{font:inherit;font-weight:650;margin-right:10px;padding:9px 14px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);cursor:pointer}
-.photo button{width:40px;height:40px;right:4px;top:4px;font-size:20px;box-shadow:0 1px 4px #0003}
+.photo button.photo-delete{width:40px;height:40px;right:4px;top:4px;font-size:20px;box-shadow:0 1px 4px #0003}.photo button.photo-open{position:static;width:100%;height:auto;padding:0;border:0;background:transparent;display:block;cursor:zoom-in}.photo-open img{display:block}.photo-analysis-tag{display:block;font-size:12px;color:var(--green);font-weight:700;margin-top:3px}
 #subStatus{min-height:0;margin:0 0 12px}#subStatus:empty{margin:0}
 .ai-panel{margin-bottom:20px}.ai-result{white-space:pre-wrap;background:#f3f7f4;border:1px solid var(--line);border-radius:12px;padding:16px;line-height:1.65;overflow-wrap:anywhere}.footer{font-size:13px;color:var(--muted);margin-top:24px}.hidden{display:none!important}
 @media(max-width:740px){.shell{padding:0 14px}.topbar{padding-top:15px;padding-bottom:15px}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.project-grid{grid-template-columns:1fr}.card{padding:17px}.two{grid-template-columns:1fr;gap:0}.toolbar{flex-direction:column}.toolbar input,.toolbar select{min-width:0}.intro .btn{width:100%}.dialog-body{padding:16px}.gallery{grid-template-columns:repeat(3,minmax(0,1fr))}}
@@ -107,6 +107,7 @@ input[type=file]::file-selector-button{font:inherit;font-weight:650;margin-right
 <div class="field"><label for="projectNotes" data-i18n="notes">Notater</label><textarea id="projectNotes"></textarea></div>
 <div class="field"><label data-i18n="photos">Bilder</label><div id="gallery" class="gallery"></div><input id="photoInput" type="file" accept="image/*" multiple><p class="hint" data-i18n="photoHint">Logg inn for å laste opp bilder. Maks 10 MB per bilde.</p><p id="photoMessage" class="message" role="status"></p></div>
 <div class="dialog-footer"><button type="button" id="deleteProject" class="btn danger hidden" data-i18n="delete">Slett prosjekt</button><div style="display:flex;gap:9px;margin-left:auto"><button type="button" id="cancel" class="btn secondary" data-i18n="cancel">Avbryt</button><button type="submit" class="btn" data-i18n="save">Lagre</button></div></div></form></div></dialog>
+<dialog id="photoDialog" class="dialog" aria-label="Bilde og AI-analyse"><div class="dialog-body"><div class="dialog-head"><h2 id="photoDialogTitle">Bilde og AI-analyse</h2><button id="closePhotoDialog" type="button" class="close" aria-label="Lukk">×</button></div><img id="photoLarge" alt="Prosjektbilde" style="width:100%;max-height:55vh;object-fit:contain;border-radius:10px"><h3 id="photoAnalysisTitle" style="margin-top:16px">AI-analyse</h3><div id="photoAnalysisText" class="ai-result"></div></div></dialog>
 <script>
 "use strict";
 const SUPABASE_URL="https://fzsxqcqkzxrfxoirfmyh.supabase.co";
@@ -131,6 +132,24 @@ function normalizeStatus(s){
   return "Planlagt";
 }
 function cleanProject(p){return{id:String(p.id||uuid()),name:String(p.name||"").slice(0,140),address:String(p.address||"").slice(0,250),status:normalizeStatus(p.status),progress:Math.min(100,Math.max(0,Number(p.progress)||0)),notes:String(p.notes||""),photos:Array.isArray(p.photos)?p.photos.filter(x=>typeof x==="string"&&x.length<1000):[]}}
+// Per-photo reports are stored inside the existing notes column; no database migration needed.
+const REPORT_START="\n\n[[BYGGVAKT_PHOTO_REPORTS_V1]]";
+const REPORT_END="[[/BYGGVAKT_PHOTO_REPORTS_V1]]";
+function splitReports(raw){
+  const value=String(raw||"");const start=value.lastIndexOf(REPORT_START);
+  if(start<0)return {notes:value,reports:{}};
+  const tail=value.slice(start+REPORT_START.length);
+  if(!tail.endsWith(REPORT_END))return {notes:value,reports:{}};
+  try{const obj=JSON.parse(tail.slice(0,-REPORT_END.length));
+    if(!obj||typeof obj!=="object"||Array.isArray(obj))throw Error("Invalid reports");
+    return {notes:value.slice(0,start),reports:obj};
+  }catch(e){return {notes:value,reports:{}}}
+}
+function joinReports(notes,reports){
+  const valid=Object.fromEntries(Object.entries(reports||{}).filter(([path,v])=>typeof path==="string"&&v&&typeof v.analysis==="string"));
+  return String(notes||"")+(Object.keys(valid).length?REPORT_START+JSON.stringify(valid)+REPORT_END:"");
+}
+function displayNotes(p){return splitReports(p.notes).notes}
 function migrateLegacy(){const old=localStorage.getItem(LEGACY);if(!old)return [];const doc=new DOMParser().parseFromString(old,"text/html");return [...doc.querySelectorAll(".project")].map(el=>{const paragraphs=[...el.querySelectorAll("p")];const title=el.querySelector("strong");const status=el.querySelector("select");const progress=el.querySelector('input[type="range"]');const notes=el.querySelector("textarea");return cleanProject({name:title?.textContent||"",address:el.querySelector("p.muted")?.textContent||"",status:status?.value||"Planlagt",progress:progress?.getAttribute("value")||0,notes:notes?.value||notes?.textContent||"",photos:[...el.querySelectorAll("img[data-storage-path]")].map(img=>img.dataset.storagePath)})}).filter(p=>p.name)}
 function load(){try{const stored=localStorage.getItem(KEY);if(stored!==null){const parsed=JSON.parse(stored);projects=Array.isArray(parsed)?parsed.map(cleanProject):[];return}projects=migrateLegacy();if(projects.length)save()}catch(e){console.error("Could not load projects",e);projects=[]}}
 function save(){if(user&&cloudReady)return;try{localStorage.setItem(KEY,JSON.stringify(projects))}catch(e){alert(t("error")+e.message)}}
@@ -178,9 +197,39 @@ async function loadCloud(){
 }
 function applyLanguage(){document.documentElement.lang=lang;$("language").value=lang;document.querySelectorAll("[data-i18n]").forEach(el=>el.textContent=t(el.dataset.i18n));document.querySelectorAll("[data-placeholder]").forEach(el=>el.placeholder=t(el.dataset.placeholder));render();if($("projectDialog").open)$("dialogTitle").textContent=t(currentId?"editProject":"newProject");$("authHint").textContent=user?user.email:t("authHint");$("toggleAuth").textContent=t("login")}
 function node(tag,cls,txt){const el=document.createElement(tag);if(cls)el.className=cls;if(txt!==undefined)el.textContent=txt;return el}
-function render(){if(!user||!cloudReady){for(const id of ["statTotal","statPlanned","statActive","statDone"])$(id).textContent="0";$("projects").replaceChildren();return}const counts={Planlagt:0,"Pågår":0,Ferdig:0};projects.forEach(p=>counts[p.status]++);$("statTotal").textContent=projects.length;$("statPlanned").textContent=counts.Planlagt;$("statActive").textContent=counts["Pågår"];$("statDone").textContent=counts.Ferdig;const term=$("search").value.trim().toLocaleLowerCase(),filter=$("filter").value;const found=projects.filter(p=>(filter==="all"||p.status===filter)&&(!term||(p.name+" "+p.address+" "+p.notes).toLocaleLowerCase().includes(term)));$("projects").replaceChildren();if(!found.length){$("projects").append(node("div","empty",t("empty")));return}for(const p of found){const card=node("article","card project-card"),head=node("div","project-head"),details=node("div"),title=node("div","project-title",p.name),address=node("div","address",p.address||t("noAddress"));details.append(title,address);const chip=node("span","chip"+(p.status==="Pågår"?" active":p.status==="Ferdig"?" done":""),t(p.status==="Pågår"?"active":p.status==="Ferdig"?"done":"planned"));head.append(details,chip);card.append(head);const progress=node("div"),caption=node("div","progress-caption");caption.append(node("span","",t("progress")),node("strong","",p.progress+"%"));const track=node("div","progress-track"),fill=node("div","progress-fill");fill.style.width=p.progress+"%";track.append(fill);progress.append(caption,track);card.append(progress);if(p.notes){const preview=node("p","muted small",p.notes.length>120?p.notes.slice(0,120)+"…":p.notes);preview.style.whiteSpace="pre-wrap";card.append(preview)}const bottom=node("div","card-bottom"),photoText=node("span","small muted",`📷 ${p.photos.length} ${lang==="no"&&p.photos.length===1?"bilde":t("photosCount")}`),open=node("button","btn secondary smallbtn",t("open"));open.type="button";open.addEventListener("click",()=>openEditor(p.id));bottom.append(photoText,open);card.append(bottom);$("projects").append(card)}}
-function openEditor(id=null){if(!user||!cloudReady){authMessage(t("aiNeedLogin"));return}currentId=id;const p=projects.find(x=>x.id===id);$("editor").reset();$("projectName").value=p?.name||"";$("projectAddress").value=p?.address||"";$("projectStatus").value=p?.status||"Planlagt";$("projectProgress").value=p?.progress||0;$("progressValue").textContent=$("projectProgress").value+"%";$("projectNotes").value=p?.notes||"";$("deleteProject").classList.toggle("hidden",!p);$("dialogTitle").textContent=t(p?"editProject":"newProject");$("photoMessage").textContent="";renderGallery();$("projectDialog").showModal()}
-function renderGallery(){const gallery=$("gallery");gallery.replaceChildren();const p=projects.find(x=>x.id===currentId);if(!p)return;for(const path of p.photos){const wrap=node("div","photo"),img=node("img");img.alt=t("photos");img.loading="lazy";wrap.append(img);const del=node("button","","×");del.type="button";del.setAttribute("aria-label",t("delete"));del.addEventListener("click",()=>{if(!confirm(t("deleteConfirm")))return;p.photos=p.photos.filter(x=>x!==path);save();renderGallery();render();syncProject(p)});wrap.append(del);gallery.append(wrap);if(sb&&user){sb.storage.from(BUCKET).createSignedUrl(path,3600).then(({data,error})=>{if(!error&&data&&img.isConnected)img.src=data.signedUrl}).catch(console.error)}}}
+function render(){if(!user||!cloudReady){for(const id of ["statTotal","statPlanned","statActive","statDone"])$(id).textContent="0";$("projects").replaceChildren();return}const counts={Planlagt:0,"Pågår":0,Ferdig:0};projects.forEach(p=>counts[p.status]++);$("statTotal").textContent=projects.length;$("statPlanned").textContent=counts.Planlagt;$("statActive").textContent=counts["Pågår"];$("statDone").textContent=counts.Ferdig;const term=$("search").value.trim().toLocaleLowerCase(),filter=$("filter").value;const found=projects.filter(p=>(filter==="all"||p.status===filter)&&(!term||(p.name+" "+p.address+" "+displayNotes(p)).toLocaleLowerCase().includes(term)));$("projects").replaceChildren();if(!found.length){$("projects").append(node("div","empty",t("empty")));return}for(const p of found){const card=node("article","card project-card"),head=node("div","project-head"),details=node("div"),title=node("div","project-title",p.name),address=node("div","address",p.address||t("noAddress"));details.append(title,address);const chip=node("span","chip"+(p.status==="Pågår"?" active":p.status==="Ferdig"?" done":""),t(p.status==="Pågår"?"active":p.status==="Ferdig"?"done":"planned"));head.append(details,chip);card.append(head);const progress=node("div"),caption=node("div","progress-caption");caption.append(node("span","",t("progress")),node("strong","",p.progress+"%"));const track=node("div","progress-track"),fill=node("div","progress-fill");fill.style.width=p.progress+"%";track.append(fill);progress.append(caption,track);card.append(progress);if(displayNotes(p)){const visible=displayNotes(p);const preview=node("p","muted small",visible.length>120?visible.slice(0,120)+"…":visible);preview.style.whiteSpace="pre-wrap";card.append(preview)}const bottom=node("div","card-bottom"),photoText=node("span","small muted",`📷 ${p.photos.length} ${lang==="no"&&p.photos.length===1?"bilde":t("photosCount")}`),open=node("button","btn secondary smallbtn",t("open"));open.type="button";open.addEventListener("click",()=>openEditor(p.id));bottom.append(photoText,open);card.append(bottom);$("projects").append(card)}}
+function openEditor(id=null){if(!user||!cloudReady){authMessage(t("aiNeedLogin"));return}currentId=id;const p=projects.find(x=>x.id===id);$("editor").reset();$("projectName").value=p?.name||"";$("projectAddress").value=p?.address||"";$("projectStatus").value=p?.status||"Planlagt";$("projectProgress").value=p?.progress||0;$("progressValue").textContent=$("projectProgress").value+"%";$("projectNotes").value=p?displayNotes(p):"";$("deleteProject").classList.toggle("hidden",!p);$("dialogTitle").textContent=t(p?"editProject":"newProject");$("photoMessage").textContent="";renderGallery();$("projectDialog").showModal()}
+function renderGallery(){
+  const gallery=$("gallery");gallery.replaceChildren();
+  const p=projects.find(x=>x.id===currentId);if(!p)return;
+  const reports=splitReports(p.notes).reports;
+  for(const path of p.photos){
+    const wrap=node("div","photo"),open=node("button","photo-open"),img=node("img");
+    open.type="button";open.setAttribute("aria-label",lang==="en"?"Open photo and analysis":"Åpne bilde og analyse");
+    img.alt=t("photos");img.loading="lazy";open.append(img);wrap.append(open);
+    if(reports[path]?.analysis)wrap.append(node("span","photo-analysis-tag",lang==="en"?"✓ AI analysis":"✓ AI-analyse"));
+    open.addEventListener("click",async()=>{
+      const report=splitReports(p.notes).reports[path];
+      $("photoDialogTitle").textContent=lang==="en"?"Photo and AI analysis":"Bilde og AI-analyse";
+      $("photoAnalysisTitle").textContent=lang==="en"?"AI analysis":"AI-analyse";
+      $("photoAnalysisText").textContent=report?.analysis||(lang==="en"?"No AI analysis is linked to this photo yet.":"Ingen AI-analyse er knyttet til dette bildet ennå.");
+      $("photoLarge").removeAttribute("src");
+      $("photoDialog").showModal();
+      try{const {data,error}=await sb.storage.from(BUCKET).createSignedUrl(path,3600);if(error)throw error;
+        if($("photoDialog").open)$("photoLarge").src=data.signedUrl;
+      }catch(e){$("photoAnalysisText").textContent=(lang==="en"?"Could not load photo: ":"Kunne ikke laste bilde: ")+e.message}
+    });
+    const del=node("button","photo-delete","×");del.type="button";del.setAttribute("aria-label",t("delete"));
+    del.addEventListener("click",()=>{if(!confirm(t("deleteConfirm")))return;
+      p.photos=p.photos.filter(x=>x!==path);
+      const parts=splitReports(p.notes);delete parts.reports[path];p.notes=joinReports(parts.notes,parts.reports);
+      save();renderGallery();render();syncProject(p)
+    });wrap.append(del);gallery.append(wrap);
+    if(sb&&user)sb.storage.from(BUCKET).createSignedUrl(path,3600).then(({data,error})=>{if(!error&&data&&img.isConnected)img.src=data.signedUrl}).catch(console.error);
+  }
+}
+$("closePhotoDialog").addEventListener("click",()=>$("photoDialog").close());
+
 function updateAuth(){const logged=!!user;$("userPill").textContent=user?.email||"";$("logout").classList.toggle("hidden",!logged);$("toggleAuth").classList.toggle("hidden",logged);$("newProject").classList.toggle("hidden",!logged);$("export").classList.toggle("hidden",!logged);$("authHint").textContent=user?.email||t("authHint");if(logged&&!recoveryMode)$("authContent").classList.add("hidden");if(recoveryMode)showAuthForm("resetForm");
   if(user&&cloudUserId!==user.id){cloudUserId=user.id;cloudReady=false;loadCloud()}
   else if(!user){cloudUserId=null;cloudReady=false;projects=[];render()}
@@ -190,7 +239,7 @@ function authMessage(msg){$("authMessage").textContent=msg}
 $("language").addEventListener("change",e=>{lang=e.target.value;localStorage.setItem("byggvaktLanguage",lang);applyLanguage()});
 $("newProject").addEventListener("click",()=>openEditor());$("closeDialog").addEventListener("click",()=>$("projectDialog").close());$("cancel").addEventListener("click",()=>$("projectDialog").close());
 $("projectProgress").addEventListener("input",e=>$("progressValue").textContent=e.target.value+"%");
-$("editor").addEventListener("submit",e=>{e.preventDefault();const data={name:$("projectName").value.trim(),address:$("projectAddress").value.trim(),status:$("projectStatus").value,progress:Number($("projectProgress").value),notes:$("projectNotes").value};if(!data.name)return;const existing=projects.find(p=>p.id===currentId);let saved;if(existing){Object.assign(existing,data);saved=existing}else{saved=cleanProject({...data,id:uuid(),photos:[]});projects.unshift(saved)}save();render();$("projectDialog").close();syncProject(saved)});
+$("editor").addEventListener("submit",e=>{e.preventDefault();const data={name:$("projectName").value.trim(),address:$("projectAddress").value.trim(),status:$("projectStatus").value,progress:Number($("projectProgress").value),notes:$("projectNotes").value};if(!data.name)return;const existing=projects.find(p=>p.id===currentId);let saved;if(existing){data.notes=joinReports(data.notes,splitReports(existing.notes).reports);Object.assign(existing,data);saved=existing}else{saved=cleanProject({...data,id:uuid(),photos:[]});projects.unshift(saved)}save();render();$("projectDialog").close();syncProject(saved)});
 $("deleteProject").addEventListener("click",()=>{if(!confirm(t("deleteConfirm")))return;const removedId=currentId;projects=projects.filter(p=>p.id!==removedId);save();render();$("projectDialog").close();removeRemote(removedId)});
 $("search").addEventListener("input",render);$("filter").addEventListener("change",render);
 $("export").addEventListener("click",()=>{if(!user||!cloudReady){authMessage(t("aiNeedLogin"));return}const blob=new Blob([JSON.stringify({format:"byggvakt-projects-v2",exportedAt:new Date().toISOString(),projects},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="byggvakt-backup-"+new Date().toISOString().slice(0,10)+".json";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)});
@@ -267,13 +316,14 @@ $("aiSaveConfirm").addEventListener("click",async()=>{
     if(uploadError)throw uploadError;
     const p=isNew?cleanProject({id:uuid(),name,photos:[],notes:""}):existing;
     const stamp=new Date().toLocaleString(lang==="en"?"en-GB":"nb-NO");
-    const entry="AI bildeanalyse ("+stamp+")\n"+analyzedPhoto.analysis;
-    const updated={...p,notes:p.notes?p.notes+"\n\n---\n\n"+entry:entry,photos:[...p.photos,path]};
+    const parts=splitReports(p.notes);
+    parts.reports[path]={analysis:analyzedPhoto.analysis,date:stamp};
+    const updated={...p,notes:joinReports(parts.notes,parts.reports),photos:[...p.photos,path]};
     // Commit to Supabase before updating the UI; do not overwrite existing notes/photos.
     const {error:saveError}=await sb.from("projects").upsert(toRow(updated,user.id));
     if(saveError)throw saveError;
     if(isNew)projects.unshift(updated);else Object.assign(existing,updated);
-    render();msg.textContent=isNew?"Nytt prosjekt opprettet. Bilde og analyse lagret.":"Bilde og analyse lagret i prosjektet.";
+    render();msg.textContent=isNew?"Nytt prosjekt opprettet. Bilde og analyse lagret.":"Bilde og analyse lagret i prosjektet. Åpne bildet for å se analysen.";
     $("aiSaveConfirm").disabled=true;
     analyzedPhoto=null;
   }catch(err){
