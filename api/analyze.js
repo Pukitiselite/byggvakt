@@ -1,3 +1,4 @@
+
 const SUPABASE_URL = "https://fzsxqcqkzxrfxoirfmyh.supabase.co";
 const SUPABASE_KEY = "sb_publishable__tjgQ5uGHOd_j-l06VnlVQ_st5GWCf2";
 
@@ -5,7 +6,9 @@ module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({
+      error: "Method not allowed"
+    });
   }
 
   try {
@@ -108,17 +111,13 @@ module.exports = async function handler(req, res) {
         error: "Subscription has expired"
       });
     }
-    if (allowed !== true) {
-      return res.status(429).json({
-        error: "Daily limit reached: 30 AI analyses. Try again tomorrow."
-      });
-    }
+
     // Verify OpenAI configuration
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
       return res.status(503).json({
-        error: "OPENAI_API_KEY is not configured"
+        error: "AI service is temporarily unavailable"
       });
     }
 
@@ -134,7 +133,8 @@ module.exports = async function handler(req, res) {
         error: "Invalid image or image too large"
       });
     }
-// Reserve one AI analysis (maximum 30 per UTC day)
+
+    // Reserve one AI analysis (maximum 30 per UTC day)
     const limitResponse = await fetch(
       `${SUPABASE_URL}/rest/v1/rpc/reserve_ai_analysis`,
       {
@@ -151,12 +151,23 @@ module.exports = async function handler(req, res) {
     );
 
     if (!limitResponse.ok) {
+      console.error(
+        "Daily AI limit verification failed:",
+        limitResponse.status
+      );
+
       return res.status(503).json({
         error: "Could not verify daily AI limit"
       });
     }
 
     const allowed = await limitResponse.json();
+
+    if (allowed !== true) {
+      return res.status(429).json({
+        error: "Daily limit reached: 30 AI analyses. Try again tomorrow."
+      });
+    }
 
     const instructions = language === "en"
       ? "Analyze visible construction damage. Describe observations, possible causes, safe repair suggestions and likely materials. Explain uncertainties. Recommend a qualified professional for structural, electrical, gas, asbestos or serious moisture risks. Do not claim certainty from a photograph."
@@ -197,13 +208,18 @@ module.exports = async function handler(req, res) {
       }
     );
 
-    const data = await response.json();
-
     if (!response.ok) {
-      return res.status(response.status).json({
-        error: data.error?.message || "AI service error"
+      console.error(
+        "OpenAI request failed:",
+        response.status
+      );
+
+      return res.status(502).json({
+        error: "AI analysis is temporarily unavailable. Please try again later."
       });
     }
+
+    const data = await response.json();
 
     const analysis = (data.output || [])
       .flatMap(item => item.content || [])
@@ -219,7 +235,7 @@ module.exports = async function handler(req, res) {
     console.error("Analysis error:", err);
 
     return res.status(500).json({
-      error: "Analysis failed"
+      error: "Analysis failed. Please try again later."
     });
   }
 };
