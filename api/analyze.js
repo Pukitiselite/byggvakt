@@ -108,31 +108,6 @@ module.exports = async function handler(req, res) {
         error: "Subscription has expired"
       });
     }
-
-       // Reserve one AI analysis (maximum 30 per UTC day)
-    const limitResponse = await fetch(
-      `${SUPABASE_URL}/rest/v1/rpc/reserve_ai_analysis`,
-      {
-        method: "POST",
-        headers: {
-          apikey: serviceKey,
-          Authorization: `Bearer ${serviceKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          p_user_id: user.id
-        })
-      }
-    );
-
-    if (!limitResponse.ok) {
-      return res.status(503).json({
-        error: "Could not verify daily AI limit"
-      });
-    }
-
-    const allowed = await limitResponse.json();
-
     if (allowed !== true) {
       return res.status(429).json({
         error: "Daily limit reached: 30 AI analyses. Try again tomorrow."
@@ -159,6 +134,29 @@ module.exports = async function handler(req, res) {
         error: "Invalid image or image too large"
       });
     }
+// Reserve one AI analysis (maximum 30 per UTC day)
+    const limitResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/rpc/reserve_ai_analysis`,
+      {
+        method: "POST",
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          p_user_id: user.id
+        })
+      }
+    );
+
+    if (!limitResponse.ok) {
+      return res.status(503).json({
+        error: "Could not verify daily AI limit"
+      });
+    }
+
+    const allowed = await limitResponse.json();
 
     const instructions = language === "en"
       ? "Analyze visible construction damage. Describe observations, possible causes, safe repair suggestions and likely materials. Explain uncertainties. Recommend a qualified professional for structural, electrical, gas, asbestos or serious moisture risks. Do not claim certainty from a photograph."
