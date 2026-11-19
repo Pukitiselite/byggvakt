@@ -197,7 +197,7 @@ function checkoutIdempotencyKey(userId, priceId, customerId, siteUrl, now = Date
   return "checkout:" + userId + ":" + params + ":" + Math.floor(now / (10 * 60 * 1000));
 }
 
-const PRODUCTION_SITE_URL = "https://byggvakt.vercel.app";
+const PRODUCTION_SITE_URL = "https://byggvaktai.com";
 const OWN_DOMAINS = ["byggvaktai.com", "www.byggvaktai.com"];
 
 // Only redirect back to our own domains (production, PUBLIC_SITE_URL or a Vercel preview).

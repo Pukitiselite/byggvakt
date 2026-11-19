@@ -277,12 +277,12 @@ test("logs never contain secrets or emails", () => {
 
 test("redirect URL only to own domains", () => {
   assert.equal(billing.safeSiteUrl("byggvakt-git-fix-x.vercel.app"), "https://byggvakt-git-fix-x.vercel.app");
-  assert.equal(billing.safeSiteUrl("evil.example.com"), "https://byggvakt.vercel.app");
-  assert.equal(billing.safeSiteUrl("evil.com/x.vercel.app"), "https://byggvakt.vercel.app");
-  assert.equal(billing.safeSiteUrl(undefined), "https://byggvakt.vercel.app");
+  assert.equal(billing.safeSiteUrl("evil.example.com"), "https://byggvaktai.com");
+  assert.equal(billing.safeSiteUrl("evil.com/x.vercel.app"), "https://byggvaktai.com");
+  assert.equal(billing.safeSiteUrl(undefined), "https://byggvaktai.com");
   assert.equal(billing.safeSiteUrl("byggvaktai.com"), "https://byggvaktai.com");
   assert.equal(billing.safeSiteUrl("www.byggvaktai.com"), "https://byggvaktai.com");
-  assert.equal(billing.safeSiteUrl("byggvaktai.com.evil.com"), "https://byggvakt.vercel.app");
+  assert.equal(billing.safeSiteUrl("byggvaktai.com.evil.com"), "https://byggvaktai.com");
 });
 
 test("idempotency key changes with parameters, stable within 10 min", () => {
