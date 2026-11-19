@@ -11,6 +11,7 @@ const billing = require("../api/_billing");
 const checkout = require("../api/create-checkout").createHandler;
 const webhook = require("../api/stripe-webhook").createHandler;
 const status = require("../api/subscription-status");
+const portal = require("../api/create-portal").createHandler;
 
 // ---------- mock Supabase REST via global fetch ----------
 function installSupabase({ legacySchema = false, failUpsert = false } = {}) {
@@ -70,6 +71,9 @@ function mockStripe() {
       list: async ({ customer }) => ({ data: Object.values(s.subs).filter((x) => x.customer === customer) }),
       retrieve: async (id) => { const x = s.subs[id]; return { ...x, metadata: { ...x.metadata }, customer: s.customers[x.customer] }; },
       update: async (id, p) => { Object.assign(s.subs[id].metadata, p.metadata || {}); return s.subs[id]; }
+    },
+    billingPortal: {
+      sessions: { create: async (p) => { s.portal = p; return { url: "https://billing.stripe.test/p/" + p.customer }; } }
     },
     checkout: {
       sessions: {
@@ -310,4 +314,20 @@ test("stored customer from another Stripe account is ignored, new one created", 
   await call(webhook(deps), evt("checkout.session.completed", st.sessions[cs.id]));
   assert.equal(db.rows[0].status, "active");
   assert.equal(db.rows[0].stripe_customer_id, cs.customer);
+});
+
+test("customer portal: only for own existing customer", async () => {
+  installSupabase(); const st = mockStripe(); const deps = { stripe: st.api };
+  assert.equal((await call(portal(deps), authed("POST", "nope"))).code, 401);
+  assert.equal((await call(portal(deps), authed("POST"))).code, 404); // no subscription yet
+  await call(checkout(deps), authed("POST"));
+  const cs = Object.values(st.sessions)[0];
+  st.pay(cs.id);
+  await call(webhook(deps), evt("checkout.session.completed", st.sessions[cs.id]));
+  const r = await call(portal(deps), authed("POST"));
+  assert.equal(r.code, 200);
+  assert.equal(st.portal.customer, cs.customer);
+  assert.equal(st.portal.return_url, "https://preview.vercel.app/?portal=return");
+  // another user cannot open Anna's portal
+  assert.equal((await call(portal(deps), authed("POST", "tok-bob"))).code, 404);
 });

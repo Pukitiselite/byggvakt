@@ -82,6 +82,9 @@ input[type=file]::file-selector-button{font:inherit;font-weight:650;margin-right
   <button id="subscribeButton" class="btn" type="button">
     Start abonnement
   </button>
+  <button id="manageButton" class="btn secondary hidden" type="button">
+    Administrer abonnement
+  </button>
 </section>
 <div class="toolbar"><input id="search" type="search" data-placeholder="search" placeholder="Søk etter prosjekt eller adresse..." aria-label="Search projects"><select id="filter" aria-label="Filter projects"><option value="all" data-i18n="all">Alle prosjekter</option><option value="Planlagt" data-i18n="planned">Planlagt</option><option value="Pågår" data-i18n="active">Pågår</option><option value="Ferdig" data-i18n="done">Ferdig</option></select><button id="export" class="btn secondary smallbtn" data-i18n="export">Eksporter sikkerhetskopi</button></div>
 <p id="syncMessage" class="hint" role="status" aria-live="polite"></p>
@@ -380,8 +383,9 @@ $("aiAnalyze").addEventListener("click",async()=>{
 let subTimer = null;
 let subChecks = 0;
 async function refreshSubscription() {
-  const button = $("subscribeButton"), statusEl = $("subStatus");
+  const button = $("subscribeButton"), statusEl = $("subStatus"), manage = $("manageButton");
   if (!button || !statusEl) return;
+  if (manage) manage.classList.add("hidden");
 
   const justPaid = new URLSearchParams(location.search).get("payment") === "success";
 
@@ -400,6 +404,9 @@ async function refreshSubscription() {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "HTTP " + response.status);
+
+    // Anyone who has (or had) a subscription can manage it: cancel, renew, change card, invoices
+    if (manage && data.status && data.status !== "none") manage.classList.remove("hidden");
 
     if (data.active) {
       button.classList.add("hidden");
@@ -460,6 +467,26 @@ $("subscribeButton").addEventListener("click", async () => {
       throw new Error(data.error || "Kunne ikke starte betaling.");
     }
 
+    window.location.href = data.url;
+  } catch (err) {
+    alert(err.message);
+    button.disabled = false;
+  }
+});
+
+$("manageButton").addEventListener("click", async () => {
+  const button = $("manageButton");
+  button.disabled = true;
+  try {
+    if (!sb) throw new Error("Innlogging er ikke tilgjengelig.");
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session?.access_token) throw new Error("Logg inn først.");
+    const response = await fetch("/api/create-portal", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + session.access_token }
+    });
+    const data = await response.json();
+    if (!response.ok || !data.url) throw new Error(data.error || "Kunne ikke åpne abonnementsinnstillinger.");
     window.location.href = data.url;
   } catch (err) {
     alert(err.message);
