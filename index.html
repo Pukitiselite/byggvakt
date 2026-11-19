@@ -75,6 +75,12 @@ input[type=file]::file-selector-button{font:inherit;font-weight:650;margin-right
 <form id="forgotForm" class="hidden"><div class="field"><label for="recoveryEmail" data-i18n="email">E-post</label><input id="recoveryEmail" type="email" required></div><div class="auth-buttons"><button class="btn" type="submit" data-i18n="sendReset">Send tilbakestillingslenke</button><button class="btn ghost" type="button" id="backLogin" data-i18n="back">Tilbake</button></div></form>
 <form id="resetForm" class="hidden"><h3 data-i18n="newPassword">Velg nytt passord</h3><div class="two"><div class="field"><label for="newPass" data-i18n="password">Passord</label><input id="newPass" type="password" minlength="8" autocomplete="new-password" required></div><div class="field"><label for="confirmPass" data-i18n="confirm">Gjenta passord</label><input id="confirmPass" type="password" minlength="8" autocomplete="new-password" required></div></div><button class="btn" type="submit" data-i18n="savePassword">Lagre passord</button></form>
 <p id="authMessage" class="message" role="status" aria-live="polite"></p></div></section>
+  <section id="installCard" class="card hidden" style="margin-bottom:20px">
+  <h2>📱 Byggvakt AI som app</h2>
+  <p id="installText" class="muted">Installer appen på telefonen eller datamaskinen – gratis, rask og uten App Store.</p>
+  <button id="installButton" class="btn" type="button">Last ned appen</button>
+  <p id="installHelp" class="message hidden"></p>
+</section>
   <section class="card" style="margin-bottom:20px">
   <h2>Byggvakt AI abonnement</h2>
   <p id="subPrice">245 kr per måned</p>
@@ -495,6 +501,42 @@ $("manageButton").addEventListener("click", async () => {
 });
 
 applyLanguage();updateAuth();
+// "Last ned appen": one-click install on Android/Chrome/Edge, instructions on iPhone/iPad
+(function () {
+  const card = $("installCard"), btn = $("installButton"), help = $("installHelp");
+  if (!card || !btn) return;
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  if (standalone) return; // already running as the installed app
+  const ua = navigator.userAgent;
+  const isIOS = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  let deferred = null;
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferred = e;
+    card.classList.remove("hidden");
+  });
+  window.addEventListener("appinstalled", () => {
+    card.classList.add("hidden");
+    deferred = null;
+  });
+
+  if (isIOS) card.classList.remove("hidden");
+
+  btn.addEventListener("click", async () => {
+    if (deferred) {
+      deferred.prompt();
+      await deferred.userChoice.catch(() => null);
+      deferred = null;
+      return;
+    }
+    help.classList.remove("hidden");
+    help.textContent = isIOS
+      ? "På iPhone/iPad: åpne siden i Safari, trykk på Del-knappen (firkant med pil opp) og velg «Legg til på Hjem-skjerm»."
+      : "Åpne nettleserens meny (⋮) og velg «Installer app» eller «Legg til på startskjermen».";
+  });
+})();
+
 // Installable app (PWA): register the service worker
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

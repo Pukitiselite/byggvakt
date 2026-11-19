@@ -1,9 +1,17 @@
-# Byggvakt AI som mobilapp (PWA)
+# Byggvakt AI som mobilapp
 
-Nettsiden kan installeres som app – ingen App Store / Google Play nødvendig.
+## 1. Fra nettsiden (fungerer nå)
+Knappen **«Last ned appen»** på byggvakt.vercel.app:
+- **Android / Chrome / Edge (PC):** installerer appen med ett klikk.
+- **iPhone/iPad:** viser veiledning: Safari → Del → «Legg til på Hjem-skjerm».
+Kortet skjules når appen allerede er installert.
 
-**iPhone (Safari):** åpne byggvakt.vercel.app → Del-knappen → «Legg til på Hjem-skjerm».
-**Android (Chrome):** åpne byggvakt.vercel.app → meny ⋮ → «Installer app» / «Legg til på startskjermen».
+## 2. Google Play (valgfritt)
+1. Opprett Google Play-utviklerkonto (engangsavgift 25 USD).
+2. Gå til pwabuilder.com → skriv inn nettadressen → «Package for stores» → Android.
+3. Last opp .aab-filen i Play Console. PWABuilder gir en `assetlinks.json` –
+   den legges i `/.well-known/assetlinks.json` i dette repoet.
 
-Appen åpnes i fullskjerm med eget ikon. Service workeren (`sw.js`) lagrer bare selve siden og ikonene,
-aldri API-svar, betaling (Stripe) eller Supabase-data. Siden hentes alltid fra nettet først, så nye versjoner vises med en gang.
+## 3. Apple App Store (valgfritt)
+Krever Apple Developer-konto (99 USD/år) og en Mac med Xcode. PWABuilder kan lage iOS-pakken.
+Merk: Apple krever at kjøp av digitale abonnementer inne i iOS-apper går via Apple (In-App Purchase).
