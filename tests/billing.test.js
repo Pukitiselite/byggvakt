@@ -280,6 +280,9 @@ test("redirect URL only to own domains", () => {
   assert.equal(billing.safeSiteUrl("evil.example.com"), "https://byggvakt.vercel.app");
   assert.equal(billing.safeSiteUrl("evil.com/x.vercel.app"), "https://byggvakt.vercel.app");
   assert.equal(billing.safeSiteUrl(undefined), "https://byggvakt.vercel.app");
+  assert.equal(billing.safeSiteUrl("byggvaktai.com"), "https://byggvaktai.com");
+  assert.equal(billing.safeSiteUrl("www.byggvaktai.com"), "https://byggvaktai.com");
+  assert.equal(billing.safeSiteUrl("byggvaktai.com.evil.com"), "https://byggvakt.vercel.app");
 });
 
 test("idempotency key changes with parameters, stable within 10 min", () => {

@@ -198,12 +198,15 @@ function checkoutIdempotencyKey(userId, priceId, customerId, siteUrl, now = Date
 }
 
 const PRODUCTION_SITE_URL = "https://byggvakt.vercel.app";
+const OWN_DOMAINS = ["byggvaktai.com", "www.byggvaktai.com"];
 
 // Only redirect back to our own domains (production, PUBLIC_SITE_URL or a Vercel preview).
 function safeSiteUrl(host) {
   const configured = (process.env.PUBLIC_SITE_URL || "").replace(/\/$/, "");
   if (configured) return configured;
-  if (host && /^[a-z0-9.-]+\.vercel\.app$/i.test(host)) return "https://" + host.toLowerCase();
+  const h = (host || "").toLowerCase();
+  if (OWN_DOMAINS.includes(h)) return "https://byggvaktai.com";
+  if (/^[a-z0-9.-]+\.vercel\.app$/.test(h)) return "https://" + h;
   return PRODUCTION_SITE_URL;
 }
 
