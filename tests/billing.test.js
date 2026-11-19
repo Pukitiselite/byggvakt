@@ -266,3 +266,28 @@ test("logs never contain secrets or emails", () => {
   assert.ok(!/a@b\.c|sk_live|Bearer/.test(out[0]));
   assert.ok(out[0].includes("u1"));
 });
+
+test("redirect URL only to own domains", () => {
+  assert.equal(billing.safeSiteUrl("byggvakt-git-fix-x.vercel.app"), "https://byggvakt-git-fix-x.vercel.app");
+  assert.equal(billing.safeSiteUrl("evil.example.com"), "https://byggvakt.vercel.app");
+  assert.equal(billing.safeSiteUrl("evil.com/x.vercel.app"), "https://byggvakt.vercel.app");
+  assert.equal(billing.safeSiteUrl(undefined), "https://byggvakt.vercel.app");
+});
+
+test("idempotency key changes with parameters, stable within 10 min", () => {
+  const t = 1_700_000_000_000;
+  const a = billing.checkoutIdempotencyKey("u", "p", "cus_1", "https://a.vercel.app", t);
+  assert.equal(a, billing.checkoutIdempotencyKey("u", "p", "cus_1", "https://a.vercel.app", t + 1000));
+  assert.notEqual(a, billing.checkoutIdempotencyKey("u", "p", "cus_1", "https://b.vercel.app", t));
+});
+
+test("live key is refused on a Preview deployment", async () => {
+  installSupabase(); const st = mockStripe();
+  process.env.STRIPE_SECRET_KEY = "sk_live_dummy"; process.env.VERCEL_ENV = "preview";
+  const r = await call(checkout({ stripe: st.api }), authed("POST"));
+  assert.equal(r.code, 503);
+  assert.equal(st.created.sessions, 0);
+  process.env.VERCEL_ENV = "production";
+  assert.equal(billing.liveKeyOutsideProduction(), false);
+  delete process.env.VERCEL_ENV; process.env.STRIPE_SECRET_KEY = "sk_test_dummy";
+});

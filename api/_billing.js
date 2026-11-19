@@ -190,8 +190,27 @@ async function resolveUserId({ sub, session }) {
   return { userId: null, source: null };
 }
 
-function checkoutIdempotencyKey(userId, priceId, now = Date.now()) {
-  return "checkout:" + userId + ":" + priceId + ":" + Math.floor(now / (10 * 60 * 1000));
+// Same user + same parameters within 10 minutes -> same Checkout Session.
+// Parameters are part of the key so a changed URL/customer never causes an idempotency error.
+function checkoutIdempotencyKey(userId, priceId, customerId, siteUrl, now = Date.now()) {
+  const params = require("crypto").createHash("sha256").update([priceId, customerId, siteUrl].join("|")).digest("hex").slice(0, 16);
+  return "checkout:" + userId + ":" + params + ":" + Math.floor(now / (10 * 60 * 1000));
+}
+
+const PRODUCTION_SITE_URL = "https://byggvakt.vercel.app";
+
+// Only redirect back to our own domains (production, PUBLIC_SITE_URL or a Vercel preview).
+function safeSiteUrl(host) {
+  const configured = (process.env.PUBLIC_SITE_URL || "").replace(/\/$/, "");
+  if (configured) return configured;
+  if (host && /^[a-z0-9.-]+\.vercel\.app$/i.test(host)) return "https://" + host.toLowerCase();
+  return PRODUCTION_SITE_URL;
+}
+
+// A live Stripe key must only ever be used by the Production deployment.
+function liveKeyOutsideProduction() {
+  const env = process.env.VERCEL_ENV;
+  return isLiveKey() && !!env && env !== "production";
 }
 
 module.exports = {
@@ -211,5 +230,7 @@ module.exports = {
   shouldOverwrite,
   resolveUserId,
   checkoutIdempotencyKey,
+  safeSiteUrl,
+  liveKeyOutsideProduction,
   _resetStripe: () => { _stripe = null; }
 };

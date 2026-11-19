@@ -2,6 +2,7 @@
 
 Vides mainīgo nosaukumi nemainās: `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`.
 Production vērtības **neaiztiec**. Sandbox vērtības pievieno tikai **Preview** videi.
+Drošībai: ja Preview vidē nejauši ir `sk_live_` atslēga, `/api/create-checkout` atsakās veidot maksājumu (503 "Live-betaling er deaktivert i testmiljøet").
 
 ## 1. Stripe Sandbox
 1. Stripe Dashboard → konta izvēlne → **Sandboxes** → izveido/atver sandbox.

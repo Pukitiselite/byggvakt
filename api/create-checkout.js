@@ -22,6 +22,11 @@ function createHandler(deps = {}) {
       return res.status(503).json({ error: "Betaling er ikke konfigurert." });
     }
 
+    if (billing.liveKeyOutsideProduction()) {
+      billing.log("error", "checkout.live_key_in_preview_blocked", { vercel_env: process.env.VERCEL_ENV });
+      return res.status(503).json({ error: "Live-betaling er deaktivert i testmiljøet." });
+    }
+
     let user;
     try {
       user = await billing.getUserFromRequest(req);
@@ -75,7 +80,7 @@ function createHandler(deps = {}) {
         return res.status(200).json({ url: reusable.url });
       }
 
-      const siteUrl = (process.env.PUBLIC_SITE_URL || "https://" + req.headers.host).replace(/\/$/, "");
+      const siteUrl = billing.safeSiteUrl(req.headers.host);
       const metadata = { supabase_user_id: user.id };
 
       const session = await stripe.checkout.sessions.create(
@@ -89,7 +94,7 @@ function createHandler(deps = {}) {
           success_url: siteUrl + "/?payment=success",
           cancel_url: siteUrl + "/?payment=cancelled"
         },
-        { idempotencyKey: billing.checkoutIdempotencyKey(user.id, priceId) }
+        { idempotencyKey: billing.checkoutIdempotencyKey(user.id, priceId, customerId, siteUrl) }
       );
 
       billing.log("info", "checkout.created", { user_id: user.id, session: session.id, livemode: session.livemode });
