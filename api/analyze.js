@@ -1,4 +1,4 @@
-
+const billing = require("./_billing");
 const SUPABASE_URL = "https://fzsxqcqkzxrfxoirfmyh.supabase.co";
 const SUPABASE_KEY = "sb_publishable__tjgQ5uGHOd_j-l06VnlVQ_st5GWCf2";
 
@@ -55,60 +55,19 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    const subscriptionUrl = new URL(
-      `${SUPABASE_URL}/rest/v1/subscriptions`
-    );
-
-    subscriptionUrl.searchParams.set(
-      "user_id",
-      `eq.${user.id}`
-    );
-
-    subscriptionUrl.searchParams.set(
-      "select",
-      "status,current_period_end"
-    );
-
-    const subscriptionResponse = await fetch(
-      subscriptionUrl,
-      {
-        headers: {
-          apikey: serviceKey,
-          Authorization: `Bearer ${serviceKey}`
-        }
-      }
-    );
-
-    if (!subscriptionResponse.ok) {
+    // Same rule as /api/subscription-status (status, period end, test vs live mode)
+    let subscription;
+    try {
+      subscription = await billing.getSubscriptionRow(user.id);
+    } catch (err) {
       return res.status(503).json({
         error: "Could not verify subscription"
       });
     }
 
-    const subscriptions = await subscriptionResponse.json();
-    const subscription = subscriptions[0];
-
-    if (
-      !subscription ||
-      !["active", "trialing"].includes(subscription.status)
-    ) {
+    if (!billing.rowGrantsAccess(subscription)) {
       return res.status(403).json({
         error: "Active subscription required — 245 NOK/month"
-      });
-    }
-
-    // Check subscription expiration
-    if (
-      subscription.current_period_end &&
-      (
-        !Number.isFinite(
-          Date.parse(subscription.current_period_end)
-        ) ||
-        Date.parse(subscription.current_period_end) <= Date.now()
-      )
-    ) {
-      return res.status(403).json({
-        error: "Subscription has expired"
       });
     }
 

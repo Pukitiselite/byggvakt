@@ -1,147 +1,143 @@
+const billing = require("./_billing");
 
-const Stripe = require("stripe");
+// POST /api/stripe-webhook
+//   400 -> invalid/missing signature
+//   500 -> temporary failure (Stripe retries automatically for up to 3 days)
+//   200 -> handled, ignored or permanently unresolvable (logged for follow-up)
+// Each handler re-reads the subscription from Stripe, so event order does not matter.
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-const SUPABASE_URL = "https://fzsxqcqkzxrfxoirfmyh.supabase.co";
+const HANDLED = new Set([
+  "checkout.session.completed",
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "customer.subscription.paused",
+  "customer.subscription.resumed",
+  "invoice.paid",
+  "invoice.payment_failed"
+]);
 
-async function saveSubscription(record) {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  const response = await fetch(
-    SUPABASE_URL + "/rest/v1/subscriptions?on_conflict=user_id",
-    {
-      method: "POST",
-      headers: {
-        apikey: key,
-        Authorization: "Bearer " + key,
-        "Content-Type": "application/json",
-        Prefer: "resolution=merge-duplicates,return=minimal"
-      },
-      body: JSON.stringify(record)
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error("Supabase: " + await response.text());
+function subscriptionIdFromEvent(event) {
+  const obj = event.data.object;
+  if (event.type === "checkout.session.completed") return billing.idOf(obj.subscription);
+  if (event.type.startsWith("customer.subscription.")) return obj.id;
+  if (event.type.startsWith("invoice.")) {
+    return billing.idOf(obj.subscription) || billing.idOf(obj.parent?.subscription_details?.subscription) || null;
   }
+  return null;
 }
 
-async function findSubscription(subscriptionId) {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const url = new URL(SUPABASE_URL + "/rest/v1/subscriptions");
-  url.searchParams.set("stripe_subscription_id", "eq." + subscriptionId);
-  url.searchParams.set("select", "user_id");
-
-  const response = await fetch(url, {
-    headers: {
-      apikey: key,
-      Authorization: "Bearer " + key
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error("Supabase lookup failed");
-  }
-
-  const rows = await response.json();
-  return rows[0]?.user_id || null;
+async function readRawBody(req) {
+  if (Buffer.isBuffer(req.body)) return req.body;
+  if (typeof req.body === "string") return Buffer.from(req.body);
+  const chunks = [];
+  for await (const chunk of req) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks);
 }
 
-async function syncSubscription(subscriptionId, userId) {
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-
-  const periodEnd =
-    subscription.items?.data?.[0]?.current_period_end ??
-    subscription.current_period_end ??
-    null;
-
-  await saveSubscription({
-    user_id: userId,
-    stripe_customer_id:
-      typeof subscription.customer === "string"
-        ? subscription.customer
-        : subscription.customer.id,
-    stripe_subscription_id: subscription.id,
-    status: subscription.status,
-    current_period_end: periodEnd
-      ? new Date(periodEnd * 1000).toISOString()
-      : null,
-    updated_at: new Date().toISOString()
-  });
-}
-
-module.exports = async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  if (
-    !process.env.STRIPE_WEBHOOK_SECRET ||
-    !process.env.SUPABASE_SERVICE_ROLE_KEY
-  ) {
-    return res.status(503).json({ error: "Server not configured" });
-  }
-
-  let event;
-
-  try {
-    const chunks = [];
-
-    for await (const chunk of req) {
-      chunks.push(Buffer.from(chunk));
+function createHandler(deps = {}) {
+  return async function handler(req, res) {
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Method not allowed" });
     }
 
-    event = stripe.webhooks.constructEvent(
-      Buffer.concat(chunks),
-      req.headers["stripe-signature"],
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (err) {
-    return res.status(400).json({ error: "Invalid Stripe signature" });
-  }
+    if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      billing.log("error", "webhook.config_missing", {
+        has_stripe: !!process.env.STRIPE_SECRET_KEY,
+        has_webhook_secret: !!process.env.STRIPE_WEBHOOK_SECRET,
+        has_service_role: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+      });
+      return res.status(503).json({ error: "Server not configured" });
+    }
 
-  try {
-    const obj = event.data.object;
+    const stripe = deps.stripe || billing.getStripe();
 
-    if (event.type === "checkout.session.completed") {
-      if (obj.mode === "subscription" && obj.subscription) {
-        const session = await stripe.checkout.sessions.retrieve(obj.id);
+    let event;
+    try {
+      const sig = req.headers["stripe-signature"];
+      if (!sig) throw new Error("missing stripe-signature header");
+      event = stripe.webhooks.constructEvent(await readRawBody(req), sig, process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+      billing.log("warn", "webhook.signature_invalid", { detail: err.message });
+      return res.status(400).json({ error: "Invalid Stripe signature" });
+    }
 
-        // Checkouts must originate from our authenticated backend.
-        // A client_reference_id alone is not sufficient proof.
-        if (!session.client_reference_id) {
-          throw new Error("Missing user reference");
-        }
+    const base = { event_id: event.id, type: event.type, livemode: event.livemode };
 
-        await syncSubscription(
-          typeof session.subscription === "string"
-            ? session.subscription
-            : session.subscription.id,
-          session.client_reference_id
-        );
+    // A test event must never change a live deployment, and vice versa.
+    if (event.livemode !== billing.isLiveKey()) {
+      billing.log("warn", "webhook.mode_mismatch_ignored", base);
+      return res.status(200).json({ received: true, ignored: "mode_mismatch" });
+    }
+
+    if (!HANDLED.has(event.type)) {
+      return res.status(200).json({ received: true, ignored: "unhandled_type" });
+    }
+
+    try {
+      const obj = event.data.object;
+
+      if (event.type === "checkout.session.completed" && obj.mode !== "subscription") {
+        return res.status(200).json({ received: true, ignored: "not_subscription" });
       }
-    }
 
-    if (
-      event.type === "customer.subscription.updated" ||
-      event.type === "customer.subscription.deleted"
-    ) {
-      const userId = await findSubscription(obj.id);
-
-      if (userId) {
-        await syncSubscription(obj.id, userId);
+      const subId = subscriptionIdFromEvent(event);
+      if (!subId) {
+        billing.log("info", "webhook.no_subscription_on_event", base);
+        return res.status(200).json({ received: true, ignored: "no_subscription" });
       }
+
+      const sub = await stripe.subscriptions.retrieve(subId, { expand: ["customer"] });
+      const session = event.type === "checkout.session.completed" ? obj : null;
+      const { userId, source } = await billing.resolveUserId({ sub, session });
+
+      if (!userId) {
+        // Permanent problem: retrying will not help. Needs manual follow-up.
+        billing.log("error", "webhook.user_unresolved", {
+          ...base,
+          reason: source || "no_metadata",
+          subscription: sub.id,
+          customer: billing.idOf(sub.customer)
+        });
+        return res.status(200).json({ received: true, ignored: "user_unresolved" });
+      }
+
+      // Backfill metadata so future events always resolve directly.
+      if (!sub.metadata?.supabase_user_id) {
+        await stripe.subscriptions.update(sub.id, { metadata: { supabase_user_id: userId } });
+      }
+
+      const record = billing.subscriptionToRecord(sub, userId);
+      const existing = await billing.getSubscriptionRow(userId);
+      const decision = billing.shouldOverwrite(existing, record);
+      if (!decision.ok) {
+        billing.log("warn", "webhook.skipped_overwrite", { ...base, user_id: userId, subscription: sub.id, reason: decision.reason });
+        return res.status(200).json({ received: true, ignored: decision.reason });
+      }
+
+      await billing.upsertRow(record);
+
+      billing.log("info", "webhook.subscription_synced", {
+        ...base,
+        user_id: userId,
+        user_source: source,
+        subscription: sub.id,
+        status: record.status,
+        cancel_at_period_end: record.cancel_at_period_end
+      });
+      return res.status(200).json({ received: true });
+    } catch (err) {
+      billing.log("error", "webhook.processing_failed", {
+        ...base,
+        stripe_type: err.type,
+        code: err.code,
+        detail: err.message
+      });
+      return res.status(500).json({ error: "Webhook processing failed" });
     }
+  };
+}
 
-    return res.status(200).json({ received: true });
-  } catch (err) {
-    console.error("Stripe webhook error:", err);
-    return res.status(500).json({ error: "Webhook processing failed" });
-  }
-};
-
-module.exports.config = {
-  api: {
-    bodyParser: false
-  }
-};
+module.exports = createHandler();
+module.exports.createHandler = createHandler;
+module.exports.config = { api: { bodyParser: false } };
