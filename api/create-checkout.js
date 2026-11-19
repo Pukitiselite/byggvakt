@@ -49,6 +49,20 @@ function createHandler(deps = {}) {
 
       // 2) Exactly one Stripe customer per user.
       let customerId = sameMode ? row.stripe_customer_id : null;
+      if (customerId) {
+        // The stored customer may belong to another Stripe account or mode
+        // (e.g. old test data). Only reuse it if it really exists here.
+        try {
+          const existing = await stripe.customers.retrieve(customerId);
+          if (existing.deleted) customerId = null;
+        } catch (err) {
+          if (err.code !== "resource_missing") throw err;
+          customerId = null;
+        }
+        if (!customerId) {
+          billing.log("warn", "checkout.stored_customer_missing", { user_id: user.id });
+        }
+      }
       if (!customerId) {
         const found = await stripe.customers.search({
           query: "metadata['supabase_user_id']:'" + user.id + "'",

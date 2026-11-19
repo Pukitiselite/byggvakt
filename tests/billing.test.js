@@ -60,7 +60,11 @@ function mockStripe() {
         const uid = query.match(/:'(.+)'$/)[1];
         return { data: Object.values(s.customers).filter((c) => c.metadata.supabase_user_id === uid) };
       },
-      create: async (p) => { const c = { id: nid("cus"), ...p }; s.customers[c.id] = c; s.created.customers++; return c; }
+      create: async (p) => { const c = { id: nid("cus"), ...p }; s.customers[c.id] = c; s.created.customers++; return c; },
+      retrieve: async (id) => {
+        if (!s.customers[id]) { const e = new Error("No such customer: '" + id + "'"); e.code = "resource_missing"; throw e; }
+        return s.customers[id];
+      }
     },
     subscriptions: {
       list: async ({ customer }) => ({ data: Object.values(s.subs).filter((x) => x.customer === customer) }),
@@ -290,4 +294,20 @@ test("live key is refused on a Preview deployment", async () => {
   process.env.VERCEL_ENV = "production";
   assert.equal(billing.liveKeyOutsideProduction(), false);
   delete process.env.VERCEL_ENV; process.env.STRIPE_SECRET_KEY = "sk_test_dummy";
+});
+
+test("stored customer from another Stripe account is ignored, new one created", async () => {
+  const db = installSupabase(); const st = mockStripe(); const deps = { stripe: st.api };
+  db.rows.push({ user_id: "user-anna", stripe_customer_id: "cus_from_old_account", stripe_subscription_id: "sub_old",
+    status: "inactive", current_period_end: null, livemode: null, updated_at: "2026-11-05" });
+  const r = await call(checkout(deps), authed("POST"));
+  assert.equal(r.code, 200);
+  assert.equal(st.created.customers, 1);
+  const cs = Object.values(st.sessions)[0];
+  assert.notEqual(cs.customer, "cus_from_old_account");
+  // after payment the row is replaced with the real live data
+  st.pay(cs.id);
+  await call(webhook(deps), evt("checkout.session.completed", st.sessions[cs.id]));
+  assert.equal(db.rows[0].status, "active");
+  assert.equal(db.rows[0].stripe_customer_id, cs.customer);
 });
