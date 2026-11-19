@@ -2,7 +2,12 @@
 <!DOCTYPE html>
 <html lang="no">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><script>
+// Old address -> new domain (same page, query and hash). Runs before anything else.
+if (location.hostname === "byggvakt.vercel.app") {
+  location.replace("https://byggvaktai.com" + location.pathname + location.search + location.hash);
+}
+</script><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#103c33">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
