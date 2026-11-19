@@ -334,3 +334,97 @@ test("customer portal: only for own existing customer", async () => {
   // another user cannot open Anna's portal
   assert.equal((await call(portal(deps), authed("POST", "tok-bob"))).code, 404);
 });
+
+// ---------- account deletion ----------
+const delAccount = require("../api/delete-account").createHandler;
+
+function installDeletionBackend({ rows = [], files = [], failStorage = false } = {}) {
+  const calls = [];
+  const state = { rows: [...rows], files: [...files], usage: true, userDeleted: false };
+  const json = (status, body) => ({ ok: status < 300, status, json: async () => body, text: async () => JSON.stringify(body) });
+  global.fetch = async (input, init = {}) => {
+    const url = new URL(String(input)); const m = init.method || "GET";
+    calls.push(m + " " + url.pathname);
+    if (url.pathname === "/auth/v1/user") {
+      return (init.headers.Authorization || "") === "Bearer tok-anna" ? json(200, { id: "user-anna", email: "a@x" }) : json(401, {});
+    }
+    if (url.pathname === "/rest/v1/subscriptions" && m === "GET") {
+      const sel = url.searchParams.get("select").split(",");
+      return json(200, state.rows.map((r) => Object.fromEntries(sel.map((c) => [c, r[c]]))));
+    }
+    if (url.pathname === "/storage/v1/object/list/byggvakt-bilder") {
+      if (failStorage) return json(500, {});
+      const body = JSON.parse(init.body);
+      assert.equal(body.prefix, "user-anna/");
+      return json(200, state.files.map((n) => ({ name: n, id: "x" })));
+    }
+    if (url.pathname === "/storage/v1/object/byggvakt-bilder" && m === "DELETE") {
+      const { prefixes } = JSON.parse(init.body);
+      prefixes.forEach((p) => assert.ok(p.startsWith("user-anna/")));
+      state.files = state.files.filter((n) => !prefixes.includes("user-anna/" + n));
+      return json(200, []);
+    }
+    if (url.pathname === "/rest/v1/ai_daily_usage" && m === "DELETE") {
+      assert.equal(url.searchParams.get("user_id"), "eq.user-anna");
+      state.usage = false; return json(204, null);
+    }
+    if (url.pathname === "/auth/v1/admin/users/user-anna" && m === "DELETE") {
+      state.userDeleted = true; return json(200, {});
+    }
+    throw new Error("unexpected " + m + " " + url);
+  };
+  return { state, calls };
+}
+const delReq = (body, tok = "tok-anna") => ({ method: "POST", headers: { authorization: "Bearer " + tok }, body });
+
+test("delete account: requires login and SLETT confirmation", async () => {
+  const { state } = installDeletionBackend();
+  assert.equal((await call(delAccount({}), delReq({ confirm: "SLETT" }, "nope"))).code, 401);
+  assert.equal((await call(delAccount({}), delReq({ confirm: "ja" }))).code, 400);
+  assert.equal(state.userDeleted, false);
+});
+
+test("delete account: cancels subscription, deletes photos, usage and user", async () => {
+  const st = mockStripe();
+  st.customers.cus_1 = { id: "cus_1", metadata: { supabase_user_id: "user-anna" } };
+  st.subs.sub_1 = { id: "sub_1", customer: "cus_1", status: "active", metadata: {} };
+  st.subs.sub_old = { id: "sub_old", customer: "cus_1", status: "canceled", metadata: {} };
+  const canceled = [];
+  st.api.subscriptions.cancel = async (id) => { canceled.push(id); st.subs[id].status = "canceled"; return st.subs[id]; };
+  const { state, calls } = installDeletionBackend({
+    rows: [{ user_id: "user-anna", stripe_customer_id: "cus_1", stripe_subscription_id: "sub_1", status: "active" }],
+    files: ["a.jpg", "b.png"]
+  });
+  const r = await call(delAccount({ stripe: st.api }), delReq({ confirm: "SLETT" }));
+  assert.equal(r.code, 200);
+  assert.deepEqual(canceled, ["sub_1"]);
+  assert.equal(state.files.length, 0);
+  assert.equal(state.usage, false);
+  assert.equal(state.userDeleted, true);
+  // billing is stopped before anything is deleted, user is deleted last
+  assert.ok(calls.findIndex((c) => c.includes("/storage/")) < calls.findIndex((c) => c.includes("/admin/users/")));
+});
+
+test("delete account: if a step fails, the account is NOT deleted", async () => {
+  const { state } = installDeletionBackend({ files: ["a.jpg"], failStorage: true });
+  const r = await call(delAccount({}), delReq({ confirm: "SLETT" }));
+  assert.equal(r.code, 500);
+  assert.equal(state.userDeleted, false);
+});
+
+test("webhook after account deletion is acknowledged, not retried forever", async () => {
+  installSupabase(); const st = mockStripe(); const deps = { stripe: st.api };
+  await call(checkout(deps), authed("POST"));
+  const sub = st.pay(Object.keys(st.sessions)[0]);
+  // simulate FK violation from Postgres (user row gone)
+  const orig = global.fetch;
+  global.fetch = async (input, init = {}) => {
+    if (String(input).includes("/rest/v1/subscriptions") && init.method === "POST") {
+      return { ok: false, status: 409, text: async () => '{"code":"23503","message":"violates foreign key constraint"}' };
+    }
+    return orig(input, init);
+  };
+  const r = await call(webhook(deps), evt("customer.subscription.deleted", { id: sub.id }));
+  assert.equal(r.code, 200);
+  assert.equal(r.body.ignored, "user_deleted");
+});
