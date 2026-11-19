@@ -4,6 +4,17 @@
 <head>
 <meta charset="utf-8"><script>
 // Old address -> new domain (same page, query and hash). Runs before anything else.
+// Google Play app (Trusted Web Activity): launched with ?source=twa or from android-app://.
+// Remembered for this app session only (Chrome storage is shared with the normal browser).
+window.IS_STORE_APP = (function () {
+  try {
+    const fromTwa = new URLSearchParams(location.search).get("source") === "twa" ||
+      (document.referrer || "").indexOf("android-app://com.byggvaktai.app") === 0;
+    if (fromTwa) sessionStorage.setItem("byggvaktStoreApp", "1");
+    return sessionStorage.getItem("byggvaktStoreApp") === "1";
+  } catch (e) { return false; }
+})();
+if (window.IS_STORE_APP) document.documentElement.classList.add("store-app");
 if (location.hostname === "byggvakt.vercel.app") {
   location.replace("https://byggvaktai.com" + location.pathname + location.search + location.hash);
 }
@@ -65,6 +76,7 @@ input[type=file]::file-selector-button{font:inherit;font-weight:650;margin-right
 .photo button.photo-delete{width:40px;height:40px;right:4px;top:4px;font-size:20px;box-shadow:0 1px 4px #0003}.photo button.photo-open{position:static;width:100%;height:auto;padding:0;border:0;background:transparent;display:block;cursor:zoom-in}.photo-open img{display:block}.photo-analysis-tag{display:block;font-size:12px;color:var(--green);font-weight:700;margin-top:3px}
 #subStatus{min-height:0;margin:0 0 12px}#subStatus:empty{margin:0}
 .ai-panel{margin-bottom:20px}.ai-result{white-space:pre-wrap;background:#f3f7f4;border:1px solid var(--line);border-radius:12px;padding:16px;line-height:1.65;overflow-wrap:anywhere}.footer{font-size:13px;color:var(--muted);margin-top:24px}.hidden{display:none!important}
+html.store-app #subPrice,html.store-app #subscribeButton,html.store-app #manageButton,html.store-app #installCard{display:none!important}
 @media(max-width:740px){.shell{padding:0 14px}.topbar{padding-top:15px;padding-bottom:15px}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.project-grid{grid-template-columns:1fr}.card{padding:17px}.two{grid-template-columns:1fr;gap:0}.toolbar{flex-direction:column}.toolbar input,.toolbar select{min-width:0}.intro .btn{width:100%}.dialog-body{padding:16px}.gallery{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
@@ -390,7 +402,7 @@ $("aiAnalyze").addEventListener("click",async()=>{
 });
     const response=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},body:JSON.stringify({image,context:$("aiContext").value.slice(0,1200),language:lang})});
     const data=await response.json();
-    if(!response.ok)throw new Error(data.error||"HTTP "+response.status);
+    if(!response.ok)throw new Error(window.IS_STORE_APP&&response.status===403?(lang==="en"?"This feature requires an active subscription on your account.":"Denne funksjonen krever et aktivt abonnement på kontoen din."):(data.error||"HTTP "+response.status));
     result.textContent=data.analysis||"";result.classList.remove("hidden");message.textContent="";
     if(result.textContent.trim()){analyzedPhoto={file,analysis:result.textContent};$("aiSavePanel").classList.remove("hidden");}
   }catch(err){message.textContent=t("aiError")+err.message}
