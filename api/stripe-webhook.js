@@ -127,6 +127,10 @@ function createHandler(deps = {}) {
       });
       return res.status(200).json({ received: true });
     } catch (err) {
+      if (err.code === "user_deleted") {
+        billing.log("info", "webhook.user_deleted_ignored", base);
+        return res.status(200).json({ received: true, ignored: "user_deleted" });
+      }
       billing.log("error", "webhook.processing_failed", {
         ...base,
         stripe_type: err.type,

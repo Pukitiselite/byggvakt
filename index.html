@@ -97,6 +97,12 @@ input[type=file]::file-selector-button{font:inherit;font-weight:650;margin-right
     Administrer abonnement
   </button>
 </section>
+  <section id="deleteCard" class="card hidden" style="margin-bottom:20px">
+  <h2>Slett konto</h2>
+  <p class="muted">Sletter kontoen, alle prosjekter, bilder og AI-analyser for godt. Et aktivt abonnement stoppes umiddelbart uten refusjon. <a href="/slett-konto.html">Les mer</a></p>
+  <button id="deleteAccountButton" class="btn danger" type="button">Slett konto</button>
+  <p id="deleteMessage" class="message" role="status" aria-live="polite"></p>
+</section>
 <div class="toolbar"><input id="search" type="search" data-placeholder="search" placeholder="Søk etter prosjekt eller adresse..." aria-label="Search projects"><select id="filter" aria-label="Filter projects"><option value="all" data-i18n="all">Alle prosjekter</option><option value="Planlagt" data-i18n="planned">Planlagt</option><option value="Pågår" data-i18n="active">Pågår</option><option value="Ferdig" data-i18n="done">Ferdig</option></select><button id="export" class="btn secondary smallbtn" data-i18n="export">Eksporter sikkerhetskopi</button></div>
 <p id="syncMessage" class="hint" role="status" aria-live="polite"></p>
 <section id="projects" class="project-grid" aria-label="Projects" style="margin-bottom:20px"></section>
@@ -120,7 +126,7 @@ input[type=file]::file-selector-button{font:inherit;font-weight:650;margin-right
 </div>
 <p class="hint" data-i18n="aiWarning">AI kan ta feil. Ved bærende konstruksjoner, strøm, gass, asbest eller alvorlig fukt: kontakt fagperson før arbeid.</p>
 </section>
-<div class="footer"><p data-i18n="localInfo">Når du er innlogget, lagres prosjekter, notater og bilder trygt i skyen og er tilgjengelige på alle enhetene dine. Uten innlogging lagres de bare i denne nettleseren. Bruk eksport for sikkerhetskopi.</p><p data-i18n="aiInfo">AI-råd er veiledende og erstatter ikke en faglig befaring.</p></div>
+<div class="footer"><p><a href="/personvern.html">Personvern</a> · <a href="/slett-konto.html">Slett konto</a></p><p data-i18n="localInfo">Når du er innlogget, lagres prosjekter, notater og bilder trygt i skyen og er tilgjengelige på alle enhetene dine. Uten innlogging lagres de bare i denne nettleseren. Bruk eksport for sikkerhetskopi.</p><p data-i18n="aiInfo">AI-råd er veiledende og erstatter ikke en faglig befaring.</p></div>
 </main>
 <dialog id="projectDialog" class="dialog"><div class="dialog-body"><div class="dialog-head"><h2 id="dialogTitle" data-i18n="newProject">Nytt prosjekt</h2><button id="closeDialog" class="close" type="button" aria-label="Close">×</button></div>
 <form id="editor"><div class="field"><label for="projectName" data-i18n="name">Prosjektnavn</label><input id="projectName" maxlength="140" required></div><div class="field"><label for="projectAddress" data-i18n="address">Adresse</label><input id="projectAddress" maxlength="250"></div>
@@ -397,6 +403,8 @@ async function refreshSubscription() {
   const button = $("subscribeButton"), statusEl = $("subStatus"), manage = $("manageButton");
   if (!button || !statusEl) return;
   if (manage) manage.classList.add("hidden");
+  const delCard = $("deleteCard");
+  if (delCard) delCard.classList.toggle("hidden", !(sb && user));
 
   const justPaid = new URLSearchParams(location.search).get("payment") === "success";
 
@@ -501,6 +509,33 @@ $("manageButton").addEventListener("click", async () => {
     window.location.href = data.url;
   } catch (err) {
     alert(err.message);
+    button.disabled = false;
+  }
+});
+
+$("deleteAccountButton").addEventListener("click", async () => {
+  const button = $("deleteAccountButton"), msg = $("deleteMessage");
+  const answer = window.prompt("Dette sletter kontoen, alle prosjekter og bilder for godt, og stopper abonnementet. Skriv SLETT for å bekrefte:");
+  if (answer === null) return;
+  if (answer.trim().toUpperCase() !== "SLETT") { msg.textContent = "Ikke slettet – du må skrive SLETT."; return; }
+  button.disabled = true;
+  msg.textContent = "Sletter kontoen …";
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session?.access_token) throw new Error("Logg inn først.");
+    const response = await fetch("/api/delete-account", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: "SLETT" })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.deleted) throw new Error(data.error || "Kunne ikke slette kontoen.");
+    try { localStorage.removeItem(KEY); localStorage.removeItem(LEGACY); } catch (e) {}
+    await sb.auth.signOut().catch(() => null);
+    alert("Kontoen din er slettet.");
+    location.href = "/";
+  } catch (err) {
+    msg.textContent = err.message;
     button.disabled = false;
   }
 });

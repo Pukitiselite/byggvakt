@@ -119,7 +119,16 @@ async function upsertRow(record) {
       throw new Error("Supabase upsert failed: HTTP 400 " + text.slice(0, 200));
     }
   }
-  if (!r.ok) throw new Error("Supabase upsert failed: HTTP " + r.status + " " + (await r.text()).slice(0, 200));
+  if (!r.ok) {
+    const text = await r.text();
+    if (text.includes("23503")) {
+      // Foreign key violation: the user account no longer exists (deleted by the user).
+      const e = new Error("user no longer exists");
+      e.code = "user_deleted";
+      throw e;
+    }
+    throw new Error("Supabase upsert failed: HTTP " + r.status + " " + text.slice(0, 200));
+  }
 }
 
 // ---------- Mapping & rules ----------
