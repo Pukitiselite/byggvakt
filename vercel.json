@@ -1,0 +1,10 @@
+{
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "byggvakt.vercel.app" }],
+      "destination": "https://byggvaktai.com/:path*",
+      "permanent": true
+    }
+  ]
+}
