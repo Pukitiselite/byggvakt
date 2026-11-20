@@ -32,6 +32,7 @@ if (location.hostname === "byggvakt.vercel.app") {
 <link rel="canonical" href="https://byggvaktai.com/">
 <!-- Text corrections verified 2026-10-22; UTF-8 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="/report.js"></script>
 <style>
 :root{--forest:#103c33;--green:#187e61;--ink:#17342e;--muted:#60766e;--line:#dbe6e0;--bg:#f3f7f4;--white:#fff;--red:#a92d31;--amber:#a96b12}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -78,7 +79,7 @@ input[type=file]::file-selector-button{font:inherit;font-weight:650;margin-right
 .photo button.photo-delete{width:40px;height:40px;right:4px;top:4px;font-size:20px;box-shadow:0 1px 4px #0003}.photo button.photo-open{position:static;width:100%;height:auto;padding:0;border:0;background:transparent;display:block;cursor:zoom-in}.photo-open img{display:block}.photo-analysis-tag{display:block;font-size:12px;color:var(--green);font-weight:700;margin-top:3px}
 #subStatus{min-height:0;margin:0 0 12px}#subStatus:empty{margin:0}
 .ai-panel{margin-bottom:20px}.ai-result{white-space:pre-wrap;background:#f3f7f4;border:1px solid var(--line);border-radius:12px;padding:16px;line-height:1.65;overflow-wrap:anywhere}.footer{font-size:13px;color:var(--muted);margin-top:24px}.hidden{display:none!important}
-.camera-btn{margin:6px 0 10px;width:100%;max-width:320px}
+.camera-btn{margin:6px 0 10px;width:100%;max-width:320px}.photo-meta{font-size:13px;color:var(--muted);margin-top:10px;line-height:1.6}.photo-meta a{color:var(--green)}.report-btn{margin:4px 0 10px;width:100%;max-width:320px}
 html.store-app #subPrice,html.store-app #subscribeButton,html.store-app #manageButton,html.store-app #installCard{display:none!important}
 @media(max-width:740px){.shell{padding:0 14px}.topbar{padding-top:15px;padding-bottom:15px}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.project-grid{grid-template-columns:1fr}.card{padding:17px}.two{grid-template-columns:1fr;gap:0}.toolbar{flex-direction:column}.toolbar input,.toolbar select{min-width:0}.intro .btn{width:100%}.dialog-body{padding:16px}.gallery{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
@@ -151,11 +152,11 @@ html.store-app #subPrice,html.store-app #subscribeButton,html.store-app #manageB
 <form id="editor"><div class="field"><label for="projectName" data-i18n="name">Prosjektnavn</label><input id="projectName" maxlength="140" required></div><div class="field"><label for="projectAddress" data-i18n="address">Adresse</label><input id="projectAddress" maxlength="250"></div>
 <div class="two"><div class="field"><label for="projectStatus" data-i18n="status">Status</label><select id="projectStatus"><option value="Planlagt" data-i18n="planned">Planlagt</option><option value="Pågår" data-i18n="active">Pågår</option><option value="Ferdig" data-i18n="done">Ferdig</option></select></div><div class="field"><label for="projectProgress"><span data-i18n="progress">Fremdrift</span>: <strong id="progressValue">0%</strong></label><input id="projectProgress" type="range" min="0" max="100" step="5" value="0" style="width:100%;margin:12px 0"></div></div>
 <div class="field"><label for="projectNotes" data-i18n="notes">Notater</label><textarea id="projectNotes"></textarea></div>
-<div class="field"><label data-i18n="photos">Bilder</label><div id="gallery" class="gallery"></div><button id="photoCameraButton" type="button" class="btn secondary camera-btn">📷 <span data-i18n="takePhoto">Ta bilde</span></button>
+<div class="field"><label data-i18n="photos">Bilder</label><div id="gallery" class="gallery"></div><button id="reportButton" type="button" class="btn report-btn hidden">📄 <span id="reportButtonText">Skaderapport (PDF)</span></button><button id="photoCameraButton" type="button" class="btn secondary camera-btn">📷 <span data-i18n="takePhoto">Ta bilde</span></button>
 <input id="photoCamera" type="file" accept="image/*" capture="environment" class="hidden">
 <input id="photoInput" type="file" accept="image/*" multiple><p class="hint" data-i18n="photoHint">Logg inn for å laste opp bilder. Maks 10 MB per bilde.</p><p id="photoMessage" class="message" role="status"></p></div>
 <div class="dialog-footer"><button type="button" id="deleteProject" class="btn danger hidden" data-i18n="delete">Slett prosjekt</button><div style="display:flex;gap:9px;margin-left:auto"><button type="button" id="cancel" class="btn secondary" data-i18n="cancel">Avbryt</button><button type="submit" class="btn" data-i18n="save">Lagre</button></div></div></form></div></dialog>
-<dialog id="photoDialog" class="dialog" aria-label="Bilde og AI-analyse"><div class="dialog-body"><div class="dialog-head"><h2 id="photoDialogTitle">Bilde og AI-analyse</h2><button id="closePhotoDialog" type="button" class="close" aria-label="Lukk">×</button></div><img id="photoLarge" alt="Prosjektbilde" style="width:100%;max-height:55vh;object-fit:contain;border-radius:10px"><h3 id="photoAnalysisTitle" style="margin-top:16px">AI-analyse</h3><div id="photoAnalysisText" class="ai-result"></div></div></dialog>
+<dialog id="photoDialog" class="dialog" aria-label="Bilde og AI-analyse"><div class="dialog-body"><div class="dialog-head"><h2 id="photoDialogTitle">Bilde og AI-analyse</h2><button id="closePhotoDialog" type="button" class="close" aria-label="Lukk">×</button></div><img id="photoLarge" alt="Prosjektbilde" style="width:100%;max-height:55vh;object-fit:contain;border-radius:10px"><div id="photoMeta" class="photo-meta"></div><h3 id="photoAnalysisTitle" style="margin-top:16px">AI-analyse</h3><div id="photoAnalysisText" class="ai-result"></div></div></dialog>
 <script>
 "use strict";
 const SUPABASE_URL="https://fzsxqcqkzxrfxoirfmyh.supabase.co";
@@ -194,7 +195,7 @@ function splitReports(raw){
   }catch(e){return {notes:value,reports:{}}}
 }
 function joinReports(notes,reports){
-  const valid=Object.fromEntries(Object.entries(reports||{}).filter(([path,v])=>typeof path==="string"&&v&&typeof v.analysis==="string"));
+  const valid=Object.fromEntries(Object.entries(reports||{}).filter(([path,v])=>typeof path==="string"&&v&&(typeof v.analysis==="string"||(v.meta&&typeof v.meta==="object"))));
   return String(notes||"")+(Object.keys(valid).length?REPORT_START+JSON.stringify(valid)+REPORT_END:"");
 }
 function displayNotes(p){return splitReports(p.notes).notes}
@@ -246,7 +247,7 @@ async function loadCloud(){
 function applyLanguage(){document.documentElement.lang=lang;$("language").value=lang;document.querySelectorAll("[data-i18n]").forEach(el=>el.textContent=t(el.dataset.i18n));document.querySelectorAll("[data-placeholder]").forEach(el=>el.placeholder=t(el.dataset.placeholder));render();if($("projectDialog").open)$("dialogTitle").textContent=t(currentId?"editProject":"newProject");$("authHint").textContent=user?user.email:t("authHint");$("toggleAuth").textContent=t("login")}
 function node(tag,cls,txt){const el=document.createElement(tag);if(cls)el.className=cls;if(txt!==undefined)el.textContent=txt;return el}
 function render(){if(!user||!cloudReady){for(const id of ["statTotal","statPlanned","statActive","statDone"])$(id).textContent="0";$("projects").replaceChildren();return}const counts={Planlagt:0,"Pågår":0,Ferdig:0};projects.forEach(p=>counts[p.status]++);$("statTotal").textContent=projects.length;$("statPlanned").textContent=counts.Planlagt;$("statActive").textContent=counts["Pågår"];$("statDone").textContent=counts.Ferdig;const term=$("search").value.trim().toLocaleLowerCase(),filter=$("filter").value;const found=projects.filter(p=>(filter==="all"||p.status===filter)&&(!term||(p.name+" "+p.address+" "+displayNotes(p)).toLocaleLowerCase().includes(term)));$("projects").replaceChildren();if(!found.length){$("projects").append(node("div","empty",t("empty")));return}for(const p of found){const card=node("article","card project-card"),head=node("div","project-head"),details=node("div"),title=node("div","project-title",p.name),address=node("div","address",p.address||t("noAddress"));details.append(title,address);const chip=node("span","chip"+(p.status==="Pågår"?" active":p.status==="Ferdig"?" done":""),t(p.status==="Pågår"?"active":p.status==="Ferdig"?"done":"planned"));head.append(details,chip);card.append(head);const progress=node("div"),caption=node("div","progress-caption");caption.append(node("span","",t("progress")),node("strong","",p.progress+"%"));const track=node("div","progress-track"),fill=node("div","progress-fill");fill.style.width=p.progress+"%";track.append(fill);progress.append(caption,track);card.append(progress);if(displayNotes(p)){const visible=displayNotes(p);const preview=node("p","muted small",visible.length>120?visible.slice(0,120)+"…":visible);preview.style.whiteSpace="pre-wrap";card.append(preview)}const bottom=node("div","card-bottom"),photoText=node("span","small muted",`📷 ${p.photos.length} ${lang==="no"&&p.photos.length===1?"bilde":t("photosCount")}`),open=node("button","btn secondary smallbtn",t("open"));open.type="button";open.addEventListener("click",()=>openEditor(p.id));bottom.append(photoText,open);card.append(bottom);$("projects").append(card)}}
-function openEditor(id=null){if(!user||!cloudReady){authMessage(t("aiNeedLogin"));return}currentId=id;const p=projects.find(x=>x.id===id);$("editor").reset();$("projectName").value=p?.name||"";$("projectAddress").value=p?.address||"";$("projectStatus").value=p?.status||"Planlagt";$("projectProgress").value=p?.progress||0;$("progressValue").textContent=$("projectProgress").value+"%";$("projectNotes").value=p?displayNotes(p):"";$("deleteProject").classList.toggle("hidden",!p);$("dialogTitle").textContent=t(p?"editProject":"newProject");$("photoMessage").textContent="";renderGallery();$("projectDialog").showModal()}
+function openEditor(id=null){if(!user||!cloudReady){authMessage(t("aiNeedLogin"));return}currentId=id;const p=projects.find(x=>x.id===id);$("editor").reset();$("projectName").value=p?.name||"";$("projectAddress").value=p?.address||"";$("projectStatus").value=p?.status||"Planlagt";$("projectProgress").value=p?.progress||0;$("progressValue").textContent=$("projectProgress").value+"%";$("projectNotes").value=p?displayNotes(p):"";$("deleteProject").classList.toggle("hidden",!p);$("reportButton").classList.toggle("hidden",!p);$("reportButtonText").textContent=lang==="en"?"Damage report (PDF)":"Skaderapport (PDF)";$("dialogTitle").textContent=t(p?"editProject":"newProject");$("photoMessage").textContent="";renderGallery();$("projectDialog").showModal()}
 function renderGallery(){
   const gallery=$("gallery");gallery.replaceChildren();
   const p=projects.find(x=>x.id===currentId);if(!p)return;
@@ -262,6 +263,7 @@ function renderGallery(){
       $("photoAnalysisTitle").textContent=lang==="en"?"AI analysis":"AI-analyse";
       $("photoAnalysisText").textContent=report?.analysis||(lang==="en"?"No AI analysis is linked to this photo yet.":"Ingen AI-analyse er knyttet til dette bildet ennå.");
       $("photoLarge").removeAttribute("src");
+      showPhotoMeta(report?.meta);
       $("photoDialog").showModal();
       try{const {data,error}=await sb.storage.from(BUCKET).createSignedUrl(path,3600);if(error)throw error;
         if($("photoDialog").open)$("photoLarge").src=data.signedUrl;
@@ -334,7 +336,7 @@ $("logout").addEventListener("click",async()=>{if(!sb)return;const {error}=await
 $("photoCameraButton").addEventListener("click",()=>$("photoCamera").click());
 $("photoCamera").addEventListener("change",e=>uploadProjectPhotos(e));
 $("photoInput").addEventListener("change",e=>uploadProjectPhotos(e));
-async function uploadProjectPhotos(e){const files=[...e.target.files];e.target.value="";if(!files.length)return;if(!sb||!user){$("photoMessage").textContent=t("needLogin");return}const p=projects.find(x=>x.id===currentId);if(!p){$("photoMessage").textContent=t("save")+" "+t("newProject");return}for(const file of files){if(!file.type.startsWith("image/")||file.size>20*1024*1024){$("photoMessage").textContent=t("invalidImage");continue}const path=user.id+"/"+uuid()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_").slice(-100);$("photoMessage").textContent=t("loading");try{const {error}=await sb.storage.from(BUCKET).upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;p.photos.push(path);save();renderGallery();render();await syncProject(p);$("photoMessage").textContent=t("uploaded")}catch(err){$("photoMessage").textContent=t("uploadError")+err.message}}}
+async function uploadProjectPhotos(e){const files=[...e.target.files];e.target.value="";if(!files.length)return;if(!sb||!user){$("photoMessage").textContent=t("needLogin");return}const p=projects.find(x=>x.id===currentId);if(!p){$("photoMessage").textContent=t("save")+" "+t("newProject");return}for(const file of files){if(!file.type.startsWith("image/")||file.size>20*1024*1024){$("photoMessage").textContent=t("invalidImage");continue}const path=user.id+"/"+uuid()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_").slice(-100);$("photoMessage").textContent=t("loading");try{const meta=await photoMeta(file);const {error}=await sb.storage.from(BUCKET).upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;p.photos.push(path);if(meta){const parts=splitReports(p.notes);parts.reports[path]={...(parts.reports[path]||{}),meta};p.notes=joinReports(parts.notes,parts.reports)}save();renderGallery();render();await syncProject(p);$("photoMessage").textContent=t("uploaded")}catch(err){$("photoMessage").textContent=t("uploadError")+err.message}}}
 if(sb){sb.auth.onAuthStateChange((event,session)=>{user=session?.user||null;if(event==="PASSWORD_RECOVERY"){recoveryMode=true;showAuthForm("resetForm");authMessage(t("recovery"))}updateAuth()});sb.auth.getSession().then(({data})=>{user=data.session?.user||null;updateAuth()}).catch(console.error)}
 
 // Save the most recently analyzed photo and report to an existing or new project.
@@ -365,6 +367,80 @@ $("aiImage").addEventListener("change",()=>{
   aiCameraFile=null;showAiSelected(null);
   analyzedPhoto=null;$("aiSavePanel").classList.add("hidden");$("aiSaveOptions").classList.add("hidden");
 });
+// ---- Photo metadata (capture time, GPS, SHA-256) and PDF damage report ----
+// file = exact bytes uploaded; exifSource = original file when a converted copy is uploaded
+async function photoMeta(file,extra,exifSource){
+  try{
+    if(!window.ByggvaktReport)return null;
+    const meta=await ByggvaktReport.readPhotoMeta(file,extra);
+    if(exifSource&&exifSource!==file){
+      const ex=ByggvaktReport.parseExif(await exifSource.arrayBuffer());
+      if(ex){Object.assign(meta,ex);delete meta.fileDate}
+      else if(exifSource.lastModified)meta.fileDate=new Date(exifSource.lastModified).toISOString();
+    }
+    return meta;
+  }catch(e){console.error("photo meta",e);return null}
+}
+function fmtTaken(m){
+  if(!m)return null;
+  if(m.taken)return m.taken.replace(/^(\d{4})-(\d{2})-(\d{2})/,lang==="en"?"$3/$2/$1":"$3.$2.$1").slice(0,16);
+  return null;
+}
+function showPhotoMeta(m){
+  const el=$("photoMeta");el.replaceChildren();if(!m)return;
+  const en=lang==="en",loc=en?"en-GB":"nb-NO";
+  const add=(label,value,href)=>{const row=node("div");row.append(node("strong","",label+": "));
+    if(href){const a=node("a","",value);a.href=href;a.target="_blank";a.rel="noopener";row.append(a)}else row.append(document.createTextNode(value));el.append(row)};
+  add(en?"Taken":"Tatt",fmtTaken(m)||(m.fileDate?new Date(m.fileDate).toLocaleString(loc)+(en?" (file date)":" (fildato)"):(en?"unknown":"ukjent")));
+  if(m.lat!=null)add(en?"Position":"Posisjon",m.lat.toFixed(5)+", "+m.lon.toFixed(5),"https://maps.google.com/?q="+m.lat+","+m.lon);
+  if(m.uploaded)add(en?"Uploaded":"Lastet opp",new Date(m.uploaded).toLocaleString(loc));
+  if(m.original!=null)add("Original",m.original?(en?"yes, unmodified":"ja, uendret"):(en?"converted to JPG":"konvertert til JPG"));
+}
+async function photoToJpeg(blob){
+  const bmp=await createImageBitmap(blob,{imageOrientation:"from-image"});
+  const scale=Math.min(1,1400/Math.max(bmp.width,bmp.height));
+  const c=document.createElement("canvas");c.width=Math.max(1,Math.round(bmp.width*scale));c.height=Math.max(1,Math.round(bmp.height*scale));
+  const ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(bmp,0,0,c.width,c.height);bmp.close&&bmp.close();
+  const out=await new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error("JPEG")),"image/jpeg",0.85));
+  return {bytes:new Uint8Array(await out.arrayBuffer()),w:c.width,h:c.height};
+}
+async function makeDamageReport(){
+  const p=projects.find(x=>x.id===currentId),btn=$("reportButton"),msg=$("photoMessage"),en=lang==="en";
+  if(!p||!sb||!user||!window.ByggvaktReport)return;
+  btn.disabled=true;msg.textContent=en?"Creating report …":"Lager rapport …";
+  try{
+    const reports=splitReports(p.notes).reports,photos=[];
+    for(let i=0;i<p.photos.length;i++){
+      const path=p.photos[i],r=reports[path]||{};
+      msg.textContent=(en?"Creating report … photo ":"Lager rapport … bilde ")+(i+1)+"/"+p.photos.length;
+      let jpeg=null,meta=r.meta||null;
+      try{
+        const {data,error}=await sb.storage.from(BUCKET).createSignedUrl(path,600);if(error)throw error;
+        const res=await fetch(data.signedUrl);if(!res.ok)throw new Error("HTTP "+res.status);
+        const blob=await res.blob();
+        const name=path.split("/").pop().replace(/^[0-9a-f-]{36}-/,"");
+        if(!meta){ // older photos: read what the stored file itself contains (time/GPS/fingerprint)
+          meta=await ByggvaktReport.readPhotoMeta(new File([blob],name,{type:blob.type,lastModified:0}),{uploaded:null,original:null});
+        }
+        try{jpeg=await photoToJpeg(blob)}catch(e){console.error("report image",e)}
+      }catch(e){console.error("report photo",e)}
+      photos.push({jpeg,meta,analysis:r.analysis||null,analysisDate:r.date||null});
+    }
+    const pdf=ByggvaktReport.buildReport({lang,user:user.email,createdAt:new Date().toISOString(),
+      project:{name:p.name,address:p.address,status:t(p.status==="Pågår"?"active":p.status==="Ferdig"?"done":"planned"),progress:p.progress,notes:displayNotes(p)},photos});
+    const safe=(p.name||"prosjekt").replace(/[^\p{L}\p{N}_-]+/gu,"-").replace(/^-+|-+$/g,"").slice(0,60)||"prosjekt";
+    const fileName=(en?"Damage-report-":"Skaderapport-")+safe+"-"+new Date().toISOString().slice(0,10)+".pdf";
+    const file=new File([pdf],fileName,{type:"application/pdf"});
+    let shared=false;
+    if(matchMedia("(pointer:coarse)").matches&&navigator.canShare&&navigator.canShare({files:[file]})){
+      try{await navigator.share({files:[file],title:fileName});shared=true}catch(e){if(e&&e.name==="AbortError")shared=true}
+    }
+    if(!shared){const url=URL.createObjectURL(file);const a=document.createElement("a");a.href=url;a.download=fileName;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000)}
+    msg.textContent=en?"✅ Report created: "+fileName:"✅ Rapport laget: "+fileName;
+  }catch(err){msg.textContent=(en?"Could not create report: ":"Kunne ikke lage rapport: ")+err.message}
+  finally{btn.disabled=false}
+}
+$("reportButton").addEventListener("click",makeDamageReport);
 function dataUrlToJpegFile(dataUrl,originalName){
   const bin=atob(dataUrl.split(",")[1]);const bytes=new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
@@ -389,19 +465,23 @@ $("aiSaveConfirm").addEventListener("click",async()=>{
   if(isNew&&!name){msg.textContent="Skriv inn prosjektnavn.";return}
   const existing=isNew?null:projects.find(p=>p.id===target);
   if(!isNew&&!existing){msg.textContent="Prosjektet ble ikke funnet.";return}
-  const file=analyzedPhoto.jpeg?dataUrlToJpegFile(analyzedPhoto.jpeg,analyzedPhoto.file.name):analyzedPhoto.file;
+  // Keep the unmodified original (with EXIF time/GPS) when the browser can display it; HEIC etc. -> converted JPG
+  const orig=analyzedPhoto.file;
+  const keepOriginal=["image/jpeg","image/png","image/webp"].includes(orig.type)&&orig.size<=20*1024*1024;
+  const file=keepOriginal||!analyzedPhoto.jpeg?orig:dataUrlToJpegFile(analyzedPhoto.jpeg,orig.name);
   if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>20*1024*1024){msg.textContent=t("aiInvalid");return}
   btn.disabled=true;msg.textContent="Lagrer bilde og analyse …";
   let path=null;
   try{
     // Store photos in the signed-in user's folder, as required by Storage RLS.
     path=user.id+"/"+uuid()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_").slice(-100);
+    const meta=await photoMeta(file,file===orig?null:{original:false},file===orig?null:orig);
     const {error:uploadError}=await sb.storage.from(BUCKET).upload(path,file,{contentType:file.type,upsert:false});
     if(uploadError)throw uploadError;
     const p=isNew?cleanProject({id:uuid(),name,photos:[],notes:""}):existing;
     const stamp=new Date().toLocaleString(lang==="en"?"en-GB":"nb-NO");
     const parts=splitReports(p.notes);
-    parts.reports[path]={analysis:analyzedPhoto.analysis,date:stamp};
+    parts.reports[path]={analysis:analyzedPhoto.analysis,date:stamp,...(meta?{meta}:{})};
     const updated={...p,notes:joinReports(parts.notes,parts.reports),photos:[...p.photos,path]};
     // Commit to Supabase before updating the UI; do not overwrite existing notes/photos.
     const {error:saveError}=await sb.from("projects").upsert(toRow(updated,user.id));
