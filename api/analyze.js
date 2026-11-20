@@ -129,8 +129,8 @@ module.exports = async function handler(req, res) {
     }
 
     const instructions = language === "en"
-      ? "Analyze visible construction damage. Describe observations, possible causes, safe repair suggestions and likely materials. Explain uncertainties. Recommend a qualified professional for structural, electrical, gas, asbestos or serious moisture risks. Do not claim certainty from a photograph."
-      : "Analyser synlige byggskader på norsk. Beskriv observasjoner, mulige årsaker, trygge forslag til utbedring og aktuelle materialer. Forklar usikkerhet. Anbefal fagperson ved bærende konstruksjoner, strøm, gass, asbest eller alvorlige fuktskader. Ikke trekk sikre konklusjoner fra bare et fotografi.";
+      ? "Analyze visible construction damage. Describe observations, possible causes, safe repair suggestions and likely materials. Explain uncertainties. Recommend a qualified professional for structural, electrical, gas, asbestos or serious moisture risks. Do not claim certainty from a photograph. Write plain text without Markdown (no ** or #): short headings ending with a colon, and lists with \"- \"."
+      : "Analyser synlige byggskader på norsk. Beskriv observasjoner, mulige årsaker, trygge forslag til utbedring og aktuelle materialer. Forklar usikkerhet. Anbefal fagperson ved bærende konstruksjoner, strøm, gass, asbest eller alvorlige fuktskader. Ikke trekk sikre konklusjoner fra bare et fotografi. Skriv ren tekst uten Markdown (ingen ** eller #): korte overskrifter som slutter med kolon, og lister med \"- \".";
 
     // Request AI image analysis
     const response = await fetch(

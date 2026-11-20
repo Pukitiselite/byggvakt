@@ -100,6 +100,14 @@
     return Object.keys(out).length ? out : null;
   }
 
+  // Removes Markdown emphasis/headings from AI text (older analyses contain **bold** and #).
+  function plainText(text) {
+    return String(text || "")
+      .replace(/\*\*(.+?)\*\*/g, "$1").replace(/__(.+?)__/g, "$1")
+      .replace(/^#{1,6}\s+/gm, "").replace(/^(\s*)[*•]\s+/gm, "$1- ")
+      .replace(/`([^`]+)`/g, "$1");
+  }
+
   async function sha256Hex(buffer) {
     const c = root.crypto && root.crypto.subtle;
     if (!c) return null;
@@ -373,7 +381,7 @@
       if (m.sha256) w.field(L.hash, m.sha256);
       w.space(6);
       w.text(L.ai + (ph.analysisDate ? " – " + ph.analysisDate : ""), { size: 11, bold: true, color: green });
-      w.text(ph.analysis && ph.analysis.trim() ? ph.analysis.trim() : L.noAi, { size: 9.5 });
+      w.text(ph.analysis && ph.analysis.trim() ? plainText(ph.analysis).trim() : L.noAi, { size: 9.5 });
     });
 
     const total = doc.pages.length;
@@ -384,7 +392,7 @@
     return doc.build();
   }
 
-  const api = { parseExif, readPhotoMeta, sha256Hex, buildReport, _wrap: wrap, _textWidth: textWidth };
+  const api = { plainText, parseExif, readPhotoMeta, sha256Hex, buildReport, _wrap: wrap, _textWidth: textWidth };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.ByggvaktReport = api;
 })(typeof window !== "undefined" ? window : globalThis);

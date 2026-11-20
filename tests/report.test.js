@@ -51,3 +51,7 @@ test("buildReport produces a valid PDF with one page per photo", () => {
   const startxref = Number(s.match(/startxref\n(\d+)/)[1]);
   assert.equal(s.slice(startxref, startxref + 4), "xref");
 });
+
+test("plainText strips Markdown from AI text", () => {
+  assert.equal(R.plainText("**Observasjoner:**\n## Tiltak\n* punkt\n- ok `kode`"), "Observasjoner:\nTiltak\n- punkt\n- ok kode");
+});
