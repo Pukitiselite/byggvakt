@@ -30,6 +30,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Check password secret
+        id: pw
         run: |
           if [ -z "$KS_PASS" ] || [ ${#KS_PASS} -lt 8 ]; then
             echo "::error::Add repository secret ANDROID_KEYSTORE_PASSWORD (at least 8 characters)."
@@ -37,68 +38,59 @@ jobs:
           fi
 
       - uses: actions/setup-java@v5
+        id: java
         with:
           distribution: temurin
           java-version: "17"
 
       - uses: android-actions/setup-android@v3
+        id: sdk
 
       - uses: actions/setup-node@v5
+        id: node
         with:
           node-version: "22"
 
-      - name: Install Bubblewrap
-        run: npm install -g @bubblewrap/cli@1
-
-      - name: Configure Bubblewrap
-        run: |
-          mkdir -p ~/.bubblewrap
-          printf '{"jdkPath":"%s","androidSdkPath":"%s"}\n' "$JAVA_HOME" "$ANDROID_HOME" > ~/.bubblewrap/config.json
-          cat ~/.bubblewrap/config.json
-
-      - name: Upload key (reuse or create)
-        run: |
-          if [ -n "$KS_B64" ]; then
-            echo "$KS_B64" | base64 -d > android.keystore
-            echo "Reusing existing upload key."
-          else
-            keytool -genkeypair -keystore android.keystore -storetype PKCS12 \
-              -alias upload -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass "$KS_PASS" -keypass "$KS_PASS" \
-              -dname "CN=Pukitis Elite, O=Pukitis Elite, L=Drammen, C=NO"
-            echo "Created NEW upload key."
-          fi
-          echo "Upload key SHA-256:"
-          keytool -list -v -keystore android.keystore -alias upload -storepass "$KS_PASS" | grep -i "SHA256:"
-
-      - name: Generate Android project
-        run: |
-          set +o pipefail
-          yes | bubblewrap update --skipVersionUpgrade --manifest=./twa-manifest.json
-          ls -la
-
-      - name: Build signed bundle
+      - name: Build with Bubblewrap
+        id: bw
         env:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
-          set +o pipefail
-          yes | bubblewrap build --skipPwaValidation --manifest=./twa-manifest.json
-          ls -la
-
-      - name: Collect output
-        run: |
+          set +e +o pipefail
+          fail() {
+            echo "FAILED: $1" >> build.log
+            tail -n 40 build.log | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}' | sed 's/^/::error title=Bubblewrap::/' ; echo
+            exit 1
+          }
+          npm install -g @bubblewrap/cli@1 >> build.log 2>&1 || fail "npm install"
+          mkdir -p ~/.bubblewrap
+          printf '{"jdkPath":"%s","androidSdkPath":"%s"}\n' "$JAVA_HOME" "$ANDROID_HOME" > ~/.bubblewrap/config.json
+          cat ~/.bubblewrap/config.json >> build.log
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > android.keystore
+          else
+            keytool -genkeypair -keystore android.keystore -storetype PKCS12 \
+              -alias upload -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$KS_PASS" -keypass "$KS_PASS" \
+              -dname "CN=Pukitis Elite, O=Pukitis Elite, L=Drammen, C=NO" >> build.log 2>&1 || fail "keytool"
+          fi
+          keytool -list -v -keystore android.keystore -alias upload -storepass "$KS_PASS" | grep -i "SHA256:" | sed 's/^/::notice title=Upload key::/'
+          yes | bubblewrap update --skipVersionUpgrade --manifest=./twa-manifest.json >> build.log 2>&1 || fail "bubblewrap update"
+          yes | bubblewrap build --skipPwaValidation --manifest=./twa-manifest.json >> build.log 2>&1 || fail "bubblewrap build"
+          ls -la >> build.log
+          [ -f app-release-bundle.aab ] || fail "no aab produced"
           mkdir -p out
           cp app-release-bundle.aab out/byggvakt-ai.aab
-          cp app-release-signed.apk out/byggvakt-ai.apk || true
+          cp app-release-signed.apk out/byggvakt-ai.apk 2>/dev/null
           cp android.keystore out/android.keystore
-          [ -f assetlinks.json ] && cp assetlinks.json out/ || true
-          cat > out/LES-MEG.txt <<'EOF'
-          byggvakt-ai.aab   -> last opp i Google Play Console.
-          android.keystore  -> opplastingsnokkel (alias: upload). Passordet er ditt ANDROID_KEYSTORE_PASSWORD.
-                               TA VARE PA DEN. Ikke del den. Slett denne nedlastingen fra GitHub etterpa.
-          byggvakt-ai.apk   -> kan installeres direkte pa telefonen for test.
-          EOF
+          [ -f assetlinks.json ] && cp assetlinks.json out/
+          printf 'byggvakt-ai.aab  -> Google Play Console\nandroid.keystore -> upload key (alias: upload), passord = ANDROID_KEYSTORE_PASSWORD. Ta vare pa den, ikke del den.\nbyggvakt-ai.apk  -> test pa telefonen\n' > out/LES-MEG.txt
+          echo "::notice title=Ferdig::AAB bygget"
+
+      - name: Report failed step
+        if: failure()
+        run: echo "::error title=Steps::${{ join(steps.*.outcome, ',') }} (pw,java,sdk,node,bw)"
 
       - uses: actions/upload-artifact@v4
         with:
