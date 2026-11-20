@@ -79,7 +79,7 @@ input[type=file]::file-selector-button{font:inherit;font-weight:650;margin-right
 .photo button.photo-delete{width:40px;height:40px;right:4px;top:4px;font-size:20px;box-shadow:0 1px 4px #0003}.photo button.photo-open{position:static;width:100%;height:auto;padding:0;border:0;background:transparent;display:block;cursor:zoom-in}.photo-open img{display:block}.photo-analysis-tag{display:block;font-size:12px;color:var(--green);font-weight:700;margin-top:3px}
 #subStatus{min-height:0;margin:0 0 12px}#subStatus:empty{margin:0}
 .ai-panel{margin-bottom:20px}.ai-result{white-space:pre-wrap;background:#f3f7f4;border:1px solid var(--line);border-radius:12px;padding:16px;line-height:1.65;overflow-wrap:anywhere}.footer{font-size:13px;color:var(--muted);margin-top:24px}.hidden{display:none!important}
-.camera-btn{margin:6px 0 10px;width:100%;max-width:320px}.photo-meta{font-size:13px;color:var(--muted);margin-top:10px;line-height:1.6}.photo-meta a{color:var(--green)}.report-btn{margin:4px 0 10px;width:100%;max-width:320px}
+.camera-btn{margin:6px 0 10px;width:100%;max-width:320px}.photo-analysis-todo{color:var(--muted);font-weight:600}.photo-meta{font-size:13px;color:var(--muted);margin-top:10px;line-height:1.6}.photo-meta a{color:var(--green)}.report-btn{margin:4px 0 10px;width:100%;max-width:320px}
 html.store-app #subPrice,html.store-app #subscribeButton,html.store-app #manageButton,html.store-app #installCard{display:none!important}
 @media(max-width:740px){.shell{padding:0 14px}.topbar{padding-top:15px;padding-bottom:15px}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.project-grid{grid-template-columns:1fr}.card{padding:17px}.two{grid-template-columns:1fr;gap:0}.toolbar{flex-direction:column}.toolbar input,.toolbar select{min-width:0}.intro .btn{width:100%}.dialog-body{padding:16px}.gallery{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
@@ -156,7 +156,7 @@ html.store-app #subPrice,html.store-app #subscribeButton,html.store-app #manageB
 <input id="photoCamera" type="file" accept="image/*" capture="environment" class="hidden">
 <input id="photoInput" type="file" accept="image/*" multiple><p class="hint" data-i18n="photoHint">Logg inn for å laste opp bilder. Maks 10 MB per bilde.</p><p id="photoMessage" class="message" role="status"></p></div>
 <div class="dialog-footer"><button type="button" id="deleteProject" class="btn danger hidden" data-i18n="delete">Slett prosjekt</button><div style="display:flex;gap:9px;margin-left:auto"><button type="button" id="cancel" class="btn secondary" data-i18n="cancel">Avbryt</button><button type="submit" class="btn" data-i18n="save">Lagre</button></div></div></form></div></dialog>
-<dialog id="photoDialog" class="dialog" aria-label="Bilde og AI-analyse"><div class="dialog-body"><div class="dialog-head"><h2 id="photoDialogTitle">Bilde og AI-analyse</h2><button id="closePhotoDialog" type="button" class="close" aria-label="Lukk">×</button></div><img id="photoLarge" alt="Prosjektbilde" style="width:100%;max-height:55vh;object-fit:contain;border-radius:10px"><div id="photoMeta" class="photo-meta"></div><h3 id="photoAnalysisTitle" style="margin-top:16px">AI-analyse</h3><div id="photoAnalysisText" class="ai-result"></div></div></dialog>
+<dialog id="photoDialog" class="dialog" aria-label="Bilde og AI-analyse"><div class="dialog-body"><div class="dialog-head"><h2 id="photoDialogTitle">Bilde og AI-analyse</h2><button id="closePhotoDialog" type="button" class="close" aria-label="Lukk">×</button></div><img id="photoLarge" alt="Prosjektbilde" style="width:100%;max-height:55vh;object-fit:contain;border-radius:10px"><div id="photoMeta" class="photo-meta"></div><h3 id="photoAnalysisTitle" style="margin-top:16px">AI-analyse</h3><div id="photoAnalysisText" class="ai-result"></div><div id="photoAiBox" class="hidden" style="margin-top:12px"><textarea id="photoAiContext" maxlength="1200" style="width:100%;min-height:70px"></textarea><button id="photoAiButton" type="button" class="btn" style="margin-top:8px;width:100%">🤖 <span id="photoAiButtonText">Analyser med AI</span></button><p id="photoAiMessage" class="message" role="status"></p></div></div></dialog>
 <script>
 "use strict";
 const SUPABASE_URL="https://fzsxqcqkzxrfxoirfmyh.supabase.co";
@@ -256,7 +256,7 @@ function renderGallery(){
     const wrap=node("div","photo"),open=node("button","photo-open"),img=node("img");
     open.type="button";open.setAttribute("aria-label",lang==="en"?"Open photo and analysis":"Åpne bilde og analyse");
     img.alt=t("photos");img.loading="lazy";open.append(img);wrap.append(open);
-    if(reports[path]?.analysis)wrap.append(node("span","photo-analysis-tag",lang==="en"?"✓ AI analysis":"✓ AI-analyse"));
+    if(reports[path]?.analysis)wrap.append(node("span","photo-analysis-tag",lang==="en"?"✓ AI analysis":"✓ AI-analyse"));else wrap.append(node("span","photo-analysis-tag photo-analysis-todo",lang==="en"?"🤖 Tap for AI analysis":"🤖 Trykk for AI-analyse"));
     open.addEventListener("click",async()=>{
       const report=splitReports(p.notes).reports[path];
       $("photoDialogTitle").textContent=lang==="en"?"Photo and AI analysis":"Bilde og AI-analyse";
@@ -264,6 +264,7 @@ function renderGallery(){
       $("photoAnalysisText").textContent=(report?.analysis&&window.ByggvaktReport?ByggvaktReport.plainText(report.analysis):report?.analysis)||(lang==="en"?"No AI analysis is linked to this photo yet.":"Ingen AI-analyse er knyttet til dette bildet ennå.");
       $("photoLarge").removeAttribute("src");
       showPhotoMeta(report?.meta);
+      photoDialogPath=path;showPhotoAiBox(!report?.analysis);
       $("photoDialog").showModal();
       try{const {data,error}=await sb.storage.from(BUCKET).createSignedUrl(path,3600);if(error)throw error;
         if($("photoDialog").open)$("photoLarge").src=data.signedUrl;
@@ -336,7 +337,16 @@ $("logout").addEventListener("click",async()=>{if(!sb)return;const {error}=await
 $("photoCameraButton").addEventListener("click",()=>$("photoCamera").click());
 $("photoCamera").addEventListener("change",e=>uploadProjectPhotos(e));
 $("photoInput").addEventListener("change",e=>uploadProjectPhotos(e));
-async function uploadProjectPhotos(e){const files=[...e.target.files];e.target.value="";if(!files.length)return;if(!sb||!user){$("photoMessage").textContent=t("needLogin");return}const p=projects.find(x=>x.id===currentId);if(!p){$("photoMessage").textContent=t("save")+" "+t("newProject");return}for(const file of files){if(!file.type.startsWith("image/")||file.size>20*1024*1024){$("photoMessage").textContent=t("invalidImage");continue}const path=user.id+"/"+uuid()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_").slice(-100);$("photoMessage").textContent=t("loading");try{const meta=await photoMeta(file);const {error}=await sb.storage.from(BUCKET).upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;p.photos.push(path);if(meta){const parts=splitReports(p.notes);parts.reports[path]={...(parts.reports[path]||{}),meta};p.notes=joinReports(parts.notes,parts.reports)}save();renderGallery();render();await syncProject(p);$("photoMessage").textContent=t("uploaded")}catch(err){$("photoMessage").textContent=t("uploadError")+err.message}}}
+// New project + photo: save the project first (needs a name), then upload into it
+async function createProjectFromEditor(){
+  const name=$("projectName").value.trim();
+  if(!name){$("photoMessage").textContent=lang==="en"?"Enter a project name first.":"Skriv inn prosjektnavn først.";$("projectName").focus();return null}
+  const saved=cleanProject({id:uuid(),name,address:$("projectAddress").value.trim(),status:$("projectStatus").value,progress:Number($("projectProgress").value),notes:$("projectNotes").value,photos:[]});
+  projects.unshift(saved);currentId=saved.id;save();render();await syncProject(saved);
+  $("deleteProject").classList.remove("hidden");$("reportButton").classList.remove("hidden");$("dialogTitle").textContent=t("editProject");
+  return saved;
+}
+async function uploadProjectPhotos(e){const files=[...e.target.files];e.target.value="";if(!files.length)return;if(!sb||!user){$("photoMessage").textContent=t("needLogin");return}const p=projects.find(x=>x.id===currentId)||await createProjectFromEditor();if(!p)return;for(const file of files){if(!file.type.startsWith("image/")||file.size>20*1024*1024){$("photoMessage").textContent=t("invalidImage");continue}const path=user.id+"/"+uuid()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_").slice(-100);$("photoMessage").textContent=t("loading");try{const meta=await photoMeta(file);const {error}=await sb.storage.from(BUCKET).upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;p.photos.push(path);if(meta){const parts=splitReports(p.notes);parts.reports[path]={...(parts.reports[path]||{}),meta};p.notes=joinReports(parts.notes,parts.reports)}save();renderGallery();render();await syncProject(p);$("photoMessage").textContent=t("uploaded")+(lang==="en"?" Tap the photo for AI analysis.":" Trykk på bildet for AI-analyse.")}catch(err){$("photoMessage").textContent=t("uploadError")+err.message}}}
 if(sb){sb.auth.onAuthStateChange((event,session)=>{user=session?.user||null;if(event==="PASSWORD_RECOVERY"){recoveryMode=true;showAuthForm("resetForm");authMessage(t("recovery"))}updateAuth()});sb.auth.getSession().then(({data})=>{user=data.session?.user||null;updateAuth()}).catch(console.error)}
 
 // Save the most recently analyzed photo and report to an existing or new project.
@@ -445,6 +455,46 @@ async function makeDamageReport(){
   finally{btn.disabled=false}
 }
 $("reportButton").addEventListener("click",makeDamageReport);
+// ---- AI analysis of a photo that is already in a project ----
+let photoDialogPath=null;
+function showPhotoAiBox(show){
+  const en=lang==="en";
+  $("photoAiBox").classList.toggle("hidden",!show);$("photoAiMessage").textContent="";$("photoAiContext").value="";
+  $("photoAiContext").placeholder=en?"Describe the problem (optional)":"Beskriv problemet (valgfritt)";
+  $("photoAiButtonText").textContent=en?"Analyze with AI":"Analyser med AI";$("photoAiButton").disabled=false;
+}
+async function blobToJpegDataUrl(blob,max){
+  const bmp=await createImageBitmap(blob,{imageOrientation:"from-image"});
+  const scale=Math.min(1,max/Math.max(bmp.width,bmp.height));
+  const c=document.createElement("canvas");c.width=Math.max(1,Math.round(bmp.width*scale));c.height=Math.max(1,Math.round(bmp.height*scale));
+  const ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(bmp,0,0,c.width,c.height);bmp.close&&bmp.close();
+  return c.toDataURL("image/jpeg",0.8);
+}
+$("photoAiButton").addEventListener("click",async()=>{
+  const en=lang==="en",msg=$("photoAiMessage"),btn=$("photoAiButton"),path=photoDialogPath;
+  const p=projects.find(x=>x.id===currentId);
+  if(!p||!path||!sb||!user){msg.textContent=t("aiNeedLogin");return}
+  btn.disabled=true;msg.textContent=t("aiLoading");
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session?.access_token)throw new Error(t("aiNeedLogin"));
+    const {data,error}=await sb.storage.from(BUCKET).createSignedUrl(path,600);if(error)throw error;
+    const res=await fetch(data.signedUrl);if(!res.ok)throw new Error("HTTP "+res.status);
+    const image=await blobToJpegDataUrl(await res.blob(),1600);
+    const context=[$("projectName").value.trim(),$("photoAiContext").value.trim()].filter(Boolean).join(". ").slice(0,1200);
+    const response=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},body:JSON.stringify({image,context,language:lang})});
+    const out=await response.json();
+    if(!response.ok)throw new Error(window.IS_STORE_APP&&response.status===403?(en?"This feature requires an active subscription on your account.":"Denne funksjonen krever et aktivt abonnement på kontoen din."):(out.error||"HTTP "+response.status));
+    const analysis=(window.ByggvaktReport?ByggvaktReport.plainText(out.analysis||""):(out.analysis||"")).trim();
+    if(!analysis)throw new Error(en?"Empty answer":"Tomt svar");
+    const parts=splitReports(p.notes);
+    parts.reports[path]={...(parts.reports[path]||{}),analysis,date:new Date().toLocaleString(en?"en-GB":"nb-NO")};
+    p.notes=joinReports(parts.notes,parts.reports);
+    save();render();renderGallery();await syncProject(p);
+    if(photoDialogPath===path){$("photoAnalysisText").textContent=analysis;showPhotoAiBox(false)}
+    $("photoMessage").textContent=en?"✅ AI analysis saved with the photo.":"✅ AI-analyse lagret på bildet.";
+  }catch(err){msg.textContent=t("aiError")+err.message;btn.disabled=false}
+});
 function dataUrlToJpegFile(dataUrl,originalName){
   const bin=atob(dataUrl.split(",")[1]);const bytes=new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
