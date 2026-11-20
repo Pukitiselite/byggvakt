@@ -43,9 +43,6 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
-        id: sdk
-
       - uses: actions/setup-node@v5
         id: node
         with:
@@ -65,6 +62,8 @@ jobs:
           }
           npm install -g @bubblewrap/cli@1 >> build.log 2>&1 || fail "npm install"
           mkdir -p ~/.bubblewrap
+          export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "SDK: $ANDROID_HOME" >> build.log; ls "$ANDROID_HOME" "$ANDROID_HOME/build-tools" >> build.log 2>&1
           printf '{"jdkPath":"%s","androidSdkPath":"%s"}\n' "$JAVA_HOME" "$ANDROID_HOME" > ~/.bubblewrap/config.json
           cat ~/.bubblewrap/config.json >> build.log
           if [ -n "$KS_B64" ]; then
@@ -90,7 +89,7 @@ jobs:
 
       - name: Report failed step
         if: failure()
-        run: echo "::error title=Steps::${{ join(steps.*.outcome, ',') }} (pw,java,sdk,node,bw)"
+        run: echo "::error title=Steps::${{ join(steps.*.outcome, ',') }} (pw,java,node,bw)"
 
       - uses: actions/upload-artifact@v4
         with:
