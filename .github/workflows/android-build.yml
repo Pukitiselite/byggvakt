@@ -27,7 +27,7 @@ jobs:
       KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check password secret
         run: |
@@ -36,16 +36,16 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
       - uses: android-actions/setup-android@v3
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Install Bubblewrap
         run: npm install -g @bubblewrap/cli@1
@@ -72,13 +72,19 @@ jobs:
           keytool -list -v -keystore android.keystore -alias upload -storepass "$KS_PASS" | grep -i "SHA256:"
 
       - name: Generate Android project
-        run: yes | bubblewrap update --skipVersionUpgrade
+        run: |
+          set +o pipefail
+          yes | bubblewrap update --skipVersionUpgrade --manifest=./twa-manifest.json
+          ls -la
 
       - name: Build signed bundle
         env:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        run: yes | bubblewrap build --skipPwaValidation
+        run: |
+          set +o pipefail
+          yes | bubblewrap build --skipPwaValidation --manifest=./twa-manifest.json
+          ls -la
 
       - name: Collect output
         run: |
