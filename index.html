@@ -365,6 +365,20 @@ $("aiImage").addEventListener("change",()=>{
   aiCameraFile=null;showAiSelected(null);
   analyzedPhoto=null;$("aiSavePanel").classList.add("hidden");$("aiSaveOptions").classList.add("hidden");
 });
+function dataUrlToJpegFile(dataUrl,originalName){
+  const bin=atob(dataUrl.split(",")[1]);const bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  const base=(originalName||"bilde").replace(/\.[^.]+$/,"");
+  return new File([bytes],base+".jpg",{type:"image/jpeg"});
+}
+// Clears the AI analysis area so the next photo starts fresh.
+function resetAiPanel(){
+  $("aiResult").textContent="";$("aiResult").classList.add("hidden");
+  $("aiSavePanel").classList.add("hidden");$("aiSaveOptions").classList.add("hidden");
+  $("aiSaveMessage").textContent="";$("aiNewProjectName").value="";
+  $("aiImage").value="";$("aiCamera").value="";aiCameraFile=null;showAiSelected(null);
+  $("aiContext").value="";
+}
 $("aiSaveConfirm").addEventListener("click",async()=>{
   const msg=$("aiSaveMessage"),btn=$("aiSaveConfirm");
   if(!user||!cloudReady||!sb||!analyzedPhoto||!$("aiResult").textContent.trim()){
@@ -375,7 +389,7 @@ $("aiSaveConfirm").addEventListener("click",async()=>{
   if(isNew&&!name){msg.textContent="Skriv inn prosjektnavn.";return}
   const existing=isNew?null:projects.find(p=>p.id===target);
   if(!isNew&&!existing){msg.textContent="Prosjektet ble ikke funnet.";return}
-  const file=analyzedPhoto.file;
+  const file=analyzedPhoto.jpeg?dataUrlToJpegFile(analyzedPhoto.jpeg,analyzedPhoto.file.name):analyzedPhoto.file;
   if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>20*1024*1024){msg.textContent=t("aiInvalid");return}
   btn.disabled=true;msg.textContent="Lagrer bilde og analyse …";
   let path=null;
@@ -393,9 +407,17 @@ $("aiSaveConfirm").addEventListener("click",async()=>{
     const {error:saveError}=await sb.from("projects").upsert(toRow(updated,user.id));
     if(saveError)throw saveError;
     if(isNew)projects.unshift(updated);else Object.assign(existing,updated);
-    render();msg.textContent=isNew?"Nytt prosjekt opprettet. Bilde og analyse lagret.":"Bilde og analyse lagret i prosjektet. Åpne bildet for å se analysen.";
-    $("aiSaveConfirm").disabled=true;
+    render();
+    const savedName=updated.name||"";
     analyzedPhoto=null;
+    resetAiPanel();
+    $("aiMessage").textContent=(lang==="en"
+      ?"✅ Photo and analysis saved in “"+savedName+"”."
+      :"✅ Bilde og analyse lagret i «"+savedName+"».");
+    btn.disabled=false;
+    // Go straight to the project the photo was saved in
+    openEditor(updated.id);
+    $("photoMessage").textContent=(lang==="en"?"✅ New photo with AI analysis added.":"✅ Nytt bilde med AI-analyse lagt til.");
   }catch(err){
     msg.textContent="Kunne ikke lagre: "+err.message;
     // If the project write failed, remove the just-uploaded unreferenced photo.
@@ -408,7 +430,8 @@ $("aiAnalyze").addEventListener("click",async()=>{
   analyzedPhoto=null;$("aiSavePanel").classList.add("hidden");$("aiSaveOptions").classList.add("hidden");
   result.classList.add("hidden");result.textContent="";
   if(!sb||!user){message.textContent=t("aiNeedLogin");return}
-  if(!file||!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>20*1024*1024){message.textContent=t("aiInvalid");return}
+  const isImage=f=>f&&((f.type||"").startsWith("image/")||/\.(heic|heif)$/i.test(f.name||""));
+  if(!isImage(file)||file.size>20*1024*1024){message.textContent=t("aiInvalid");return}
   button.disabled=true;message.textContent=t("aiLoading");
   try{
     const {data:{session}}=await sb.auth.getSession();
@@ -435,7 +458,7 @@ $("aiAnalyze").addEventListener("click",async()=>{
     const data=await response.json();
     if(!response.ok)throw new Error(window.IS_STORE_APP&&response.status===403?(lang==="en"?"This feature requires an active subscription on your account.":"Denne funksjonen krever et aktivt abonnement på kontoen din."):(data.error||"HTTP "+response.status));
     result.textContent=data.analysis||"";result.classList.remove("hidden");message.textContent="";
-    if(result.textContent.trim()){analyzedPhoto={file,analysis:result.textContent};$("aiSavePanel").classList.remove("hidden");}
+    if(result.textContent.trim()){analyzedPhoto={file,analysis:result.textContent,jpeg:image};$("aiSavePanel").classList.remove("hidden");}
   }catch(err){message.textContent=t("aiError")+err.message}
   finally{button.disabled=false}
 });
