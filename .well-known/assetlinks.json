@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.byggvaktai.app",
+      "sha256_cert_fingerprints": [
+        "3A:A2:22:FB:4E:04:AC:87:08:26:F0:9E:63:12:56:B8:D5:F7:3A:60:FA:25:51:76:A1:0D:E2:F5:2F:E5:AA:8F",
+        "C4:FA:DF:1F:EC:6E:EF:62:07:E2:36:A6:3A:0C:DF:F1:8E:A1:69:21:B8:9A:AB:5F:57:50:E0:C5:05:DB:F6:00"
+      ]
+    }
+  }
+]
