@@ -264,7 +264,9 @@ function renderGallery(){
     del.addEventListener("click",()=>{if(!confirm(t("deleteConfirm")))return;
       p.photos=p.photos.filter(x=>x!==path);
       const parts=splitReports(p.notes);delete parts.reports[path];p.notes=joinReports(parts.notes,parts.reports);
-      save();renderGallery();render();syncProject(p)
+      save();renderGallery();render();syncProject(p);
+      // Also delete the file itself from Storage (not only the reference)
+      removePhotoFiles([path]);
     });wrap.append(del);gallery.append(wrap);
     if(sb&&user)sb.storage.from(BUCKET).createSignedUrl(path,3600).then(({data,error})=>{if(!error&&data&&img.isConnected)img.src=data.signedUrl}).catch(console.error);
   }
@@ -281,7 +283,14 @@ $("language").addEventListener("change",e=>{lang=e.target.value;localStorage.set
 $("newProject").addEventListener("click",()=>openEditor());$("closeDialog").addEventListener("click",()=>$("projectDialog").close());$("cancel").addEventListener("click",()=>$("projectDialog").close());
 $("projectProgress").addEventListener("input",e=>$("progressValue").textContent=e.target.value+"%");
 $("editor").addEventListener("submit",e=>{e.preventDefault();const data={name:$("projectName").value.trim(),address:$("projectAddress").value.trim(),status:$("projectStatus").value,progress:Number($("projectProgress").value),notes:$("projectNotes").value};if(!data.name)return;const existing=projects.find(p=>p.id===currentId);let saved;if(existing){data.notes=joinReports(data.notes,splitReports(existing.notes).reports);Object.assign(existing,data);saved=existing}else{saved=cleanProject({...data,id:uuid(),photos:[]});projects.unshift(saved)}save();render();$("projectDialog").close();syncProject(saved)});
-$("deleteProject").addEventListener("click",()=>{if(!confirm(t("deleteConfirm")))return;const removedId=currentId;projects=projects.filter(p=>p.id!==removedId);save();render();$("projectDialog").close();removeRemote(removedId)});
+$("deleteProject").addEventListener("click",()=>{if(!confirm(t("deleteConfirm")))return;const removedId=currentId;const removedPhotos=(projects.find(p=>p.id===removedId)?.photos)||[];projects=projects.filter(p=>p.id!==removedId);save();render();$("projectDialog").close();removeRemote(removedId);removePhotoFiles(removedPhotos)});
+// Deletes photo files from Storage. Only the user's own folder is allowed (Storage RLS).
+async function removePhotoFiles(paths){
+  if(!sb||!user||!paths||!paths.length)return;
+  const own=paths.filter(x=>typeof x==="string"&&x.indexOf(user.id+"/")===0);
+  if(!own.length)return;
+  try{const {error}=await sb.storage.from(BUCKET).remove(own);if(error)throw error}catch(err){console.error("Photo delete failed",err)}
+}
 $("search").addEventListener("input",render);$("filter").addEventListener("change",render);
 $("export").addEventListener("click",()=>{if(!user||!cloudReady){authMessage(t("aiNeedLogin"));return}const blob=new Blob([JSON.stringify({format:"byggvakt-projects-v2",exportedAt:new Date().toISOString(),projects},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="byggvakt-backup-"+new Date().toISOString().slice(0,10)+".json";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)});
 $("toggleAuth").addEventListener("click",()=>{const box=$("authContent");if(box.classList.contains("hidden"))showAuthForm("loginForm");else box.classList.add("hidden")});
