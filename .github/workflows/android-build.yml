@@ -63,6 +63,7 @@ jobs:
           npm install -g @bubblewrap/cli@1 >> build.log 2>&1 || fail "npm install"
           mkdir -p ~/.bubblewrap
           export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          [ -e "$ANDROID_HOME/tools" ] || sudo ln -s "$ANDROID_HOME/cmdline-tools/latest" "$ANDROID_HOME/tools"
           echo "SDK: $ANDROID_HOME" >> build.log; ls "$ANDROID_HOME" "$ANDROID_HOME/build-tools" >> build.log 2>&1
           printf '{"jdkPath":"%s","androidSdkPath":"%s"}\n' "$JAVA_HOME" "$ANDROID_HOME" > ~/.bubblewrap/config.json
           cat ~/.bubblewrap/config.json >> build.log
