@@ -1,0 +1,101 @@
+name: Android (Google Play) build
+
+# Builds the Trusted Web Activity wrapper for https://byggvaktai.com with Bubblewrap.
+# Runs only on the android-build branch or manually; it never touches the website.
+#
+# Required repository secret:
+#   ANDROID_KEYSTORE_PASSWORD  - password for the upload key (choose it yourself, keep it safe)
+# Optional repository secret (for later updates, so the same upload key is reused):
+#   ANDROID_KEYSTORE_BASE64    - base64 of android.keystore from the first build
+
+on:
+  push:
+    branches: [android-build]
+    paths: ["android/**", ".github/workflows/android-build.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    env:
+      KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check password secret
+        run: |
+          if [ -z "$KS_PASS" ] || [ ${#KS_PASS} -lt 8 ]; then
+            echo "::error::Add repository secret ANDROID_KEYSTORE_PASSWORD (at least 8 characters)."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Bubblewrap
+        run: npm install -g @bubblewrap/cli@1
+
+      - name: Configure Bubblewrap
+        run: |
+          mkdir -p ~/.bubblewrap
+          printf '{"jdkPath":"%s","androidSdkPath":"%s"}\n' "$JAVA_HOME" "$ANDROID_HOME" > ~/.bubblewrap/config.json
+          cat ~/.bubblewrap/config.json
+
+      - name: Upload key (reuse or create)
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > android.keystore
+            echo "Reusing existing upload key."
+          else
+            keytool -genkeypair -keystore android.keystore -storetype PKCS12 \
+              -alias upload -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$KS_PASS" -keypass "$KS_PASS" \
+              -dname "CN=Pukitis Elite, O=Pukitis Elite, L=Drammen, C=NO"
+            echo "Created NEW upload key."
+          fi
+          echo "Upload key SHA-256:"
+          keytool -list -v -keystore android.keystore -alias upload -storepass "$KS_PASS" | grep -i "SHA256:"
+
+      - name: Generate Android project
+        run: yes | bubblewrap update --skipVersionUpgrade
+
+      - name: Build signed bundle
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: yes | bubblewrap build --skipPwaValidation
+
+      - name: Collect output
+        run: |
+          mkdir -p out
+          cp app-release-bundle.aab out/byggvakt-ai.aab
+          cp app-release-signed.apk out/byggvakt-ai.apk || true
+          cp android.keystore out/android.keystore
+          [ -f assetlinks.json ] && cp assetlinks.json out/ || true
+          cat > out/LES-MEG.txt <<'EOF'
+          byggvakt-ai.aab   -> last opp i Google Play Console.
+          android.keystore  -> opplastingsnokkel (alias: upload). Passordet er ditt ANDROID_KEYSTORE_PASSWORD.
+                               TA VARE PA DEN. Ikke del den. Slett denne nedlastingen fra GitHub etterpa.
+          byggvakt-ai.apk   -> kan installeres direkte pa telefonen for test.
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: byggvakt-ai-android
+          path: android/out/
+          retention-days: 1

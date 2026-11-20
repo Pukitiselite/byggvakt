@@ -1,0 +1,43 @@
+{
+  "packageId": "com.byggvaktai.app",
+  "host": "byggvaktai.com",
+  "name": "Byggvakt AI",
+  "launcherName": "Byggvakt",
+  "display": "standalone",
+  "themeColor": "#103C33",
+  "themeColorDark": "#103C33",
+  "navigationColor": "#103C33",
+  "navigationColorDark": "#103C33",
+  "navigationDividerColor": "#103C33",
+  "navigationDividerColorDark": "#103C33",
+  "backgroundColor": "#F3F7F4",
+  "enableNotifications": false,
+  "startUrl": "/?source=twa",
+  "iconUrl": "https://byggvaktai.com/icons/icon-512.png",
+  "maskableIconUrl": "https://byggvaktai.com/icons/icon-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "upload"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://byggvaktai.com/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://byggvaktai.com/",
+  "minSdkVersion": 21,
+  "orientation": "portrait",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "appVersion": "1.0.0"
+}
