@@ -65,7 +65,7 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    if (!billing.rowGrantsAccess(subscription)) {
+    if (!billing.rowGrantsAccess(subscription) && !billing.isFreeAccessUser(user)) {
       return res.status(403).json({
         error: "Active subscription required — 245 NOK/month"
       });

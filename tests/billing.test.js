@@ -437,3 +437,14 @@ test("webhook after account deletion is acknowledged, not retried forever", asyn
   assert.equal(r.code, 200);
   assert.equal(r.body.ignored, "user_deleted");
 });
+
+test("free tester access: only confirmed e-mails on the list", () => {
+  const list = "Tester@Example.com, other@x.no";
+  const ok = { email: "tester@example.com", email_confirmed_at: "2026-11-20T00:00:00Z" };
+  assert.equal(billing.isFreeAccessUser(ok, list), true);
+  assert.equal(billing.isFreeAccessUser({ ...ok, email_confirmed_at: null }, list), false);
+  assert.equal(billing.isFreeAccessUser({ ...ok, email: "someone@else.com" }, list), false);
+  assert.equal(billing.isFreeAccessUser(ok, ""), false);
+  assert.equal(billing.isFreeAccessUser(ok, undefined), false);
+  assert.equal(billing.isFreeAccessUser(null, list), false);
+});
