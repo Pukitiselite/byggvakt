@@ -412,9 +412,12 @@ $("aiSaveConfirm").addEventListener("click",async()=>{
     analyzedPhoto=null;
     resetAiPanel();
     $("aiMessage").textContent=(lang==="en"
-      ?"✅ Photo and analysis saved in “"+savedName+"”. Open the project to see them."
-      :"✅ Bilde og analyse lagret i «"+savedName+"». Åpne prosjektet for å se dem.");
+      ?"✅ Photo and analysis saved in “"+savedName+"”."
+      :"✅ Bilde og analyse lagret i «"+savedName+"».");
     btn.disabled=false;
+    // Go straight to the project the photo was saved in
+    openEditor(updated.id);
+    $("photoMessage").textContent=(lang==="en"?"✅ New photo with AI analysis added.":"✅ Nytt bilde med AI-analyse lagt til.");
   }catch(err){
     msg.textContent="Kunne ikke lagre: "+err.message;
     // If the project write failed, remove the just-uploaded unreferenced photo.
