@@ -226,7 +226,17 @@ function liveKeyOutsideProduction() {
   return isLiveKey() && !!env && env !== "production";
 }
 
+// Free test access (e.g. testers while the app is in Google review).
+// FREE_ACCESS_EMAILS = "a@x.com, b@y.com" (Vercel env). Confirmed e-mail required.
+function isFreeAccessUser(user, list = process.env.FREE_ACCESS_EMAILS) {
+  if (!user || !user.email || !list) return false;
+  if (!user.email_confirmed_at && !user.confirmed_at) return false;
+  const emails = String(list).toLowerCase().split(/[\s,;]+/).filter(Boolean);
+  return emails.includes(String(user.email).trim().toLowerCase());
+}
+
 module.exports = {
+  isFreeAccessUser,
   SUPABASE_URL,
   ACCESS_STATUSES,
   BLOCKING_STATUSES,

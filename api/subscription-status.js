@@ -2,7 +2,7 @@ const billing = require("./_billing");
 
 // GET /api/subscription-status
 // Authorization: Bearer <Supabase access token>
-// -> { active, status, current_period_end, cancel_at_period_end }
+// -> { active, tester, status, current_period_end, cancel_at_period_end }
 // Read-only. Rows are written only by the signature-verified Stripe webhook.
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
@@ -30,8 +30,12 @@ module.exports = async function handler(req, res) {
     const sameMode = row && (typeof row.livemode !== "boolean" || row.livemode === billing.isLiveKey());
     const shown = sameMode ? row : null;
 
+    const paid = billing.rowGrantsAccess(shown);
+    const tester = !paid && billing.isFreeAccessUser(user);
+
     return res.status(200).json({
-      active: billing.rowGrantsAccess(shown),
+      active: paid || tester,
+      tester,
       status: shown?.status || "none",
       current_period_end: shown?.current_period_end || null,
       cancel_at_period_end: !!shown?.cancel_at_period_end
