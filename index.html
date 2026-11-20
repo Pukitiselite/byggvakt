@@ -261,7 +261,7 @@ function renderGallery(){
       const report=splitReports(p.notes).reports[path];
       $("photoDialogTitle").textContent=lang==="en"?"Photo and AI analysis":"Bilde og AI-analyse";
       $("photoAnalysisTitle").textContent=lang==="en"?"AI analysis":"AI-analyse";
-      $("photoAnalysisText").textContent=report?.analysis||(lang==="en"?"No AI analysis is linked to this photo yet.":"Ingen AI-analyse er knyttet til dette bildet ennå.");
+      $("photoAnalysisText").textContent=(report?.analysis&&window.ByggvaktReport?ByggvaktReport.plainText(report.analysis):report?.analysis)||(lang==="en"?"No AI analysis is linked to this photo yet.":"Ingen AI-analyse er knyttet til dette bildet ennå.");
       $("photoLarge").removeAttribute("src");
       showPhotoMeta(report?.meta);
       $("photoDialog").showModal();
@@ -421,6 +421,10 @@ async function makeDamageReport(){
         const name=path.split("/").pop().replace(/^[0-9a-f-]{36}-/,"");
         if(!meta){ // older photos: read what the stored file itself contains (time/GPS/fingerprint)
           meta=await ByggvaktReport.readPhotoMeta(new File([blob],name,{type:blob.type,lastModified:0}),{uploaded:null,original:null});
+          try{const folder=path.slice(0,path.lastIndexOf("/")),obj=path.slice(path.lastIndexOf("/")+1);
+            const {data:list}=await sb.storage.from(BUCKET).list(folder,{search:obj,limit:5});
+            const hit=(list||[]).find(o=>o.name===obj);if(hit&&hit.created_at)meta.uploaded=hit.created_at;
+          }catch(e){console.error("upload time",e)}
         }
         try{jpeg=await photoToJpeg(blob)}catch(e){console.error("report image",e)}
       }catch(e){console.error("report photo",e)}
@@ -537,7 +541,7 @@ $("aiAnalyze").addEventListener("click",async()=>{
     const response=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},body:JSON.stringify({image,context:$("aiContext").value.slice(0,1200),language:lang})});
     const data=await response.json();
     if(!response.ok)throw new Error(window.IS_STORE_APP&&response.status===403?(lang==="en"?"This feature requires an active subscription on your account.":"Denne funksjonen krever et aktivt abonnement på kontoen din."):(data.error||"HTTP "+response.status));
-    result.textContent=data.analysis||"";result.classList.remove("hidden");message.textContent="";
+    result.textContent=window.ByggvaktReport?ByggvaktReport.plainText(data.analysis||""):(data.analysis||"");result.classList.remove("hidden");message.textContent="";
     if(result.textContent.trim()){analyzedPhoto={file,analysis:result.textContent,jpeg:image};$("aiSavePanel").classList.remove("hidden");}
   }catch(err){message.textContent=t("aiError")+err.message}
   finally{button.disabled=false}
