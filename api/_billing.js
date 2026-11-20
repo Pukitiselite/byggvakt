@@ -145,7 +145,8 @@ function subscriptionToRecord(sub, userId) {
     stripe_subscription_id: sub.id,
     status: sub.status,
     current_period_end: periodEndIso(sub),
-    cancel_at_period_end: !!sub.cancel_at_period_end,
+    // Flexible billing mode cancels via cancel_at (cancel_at_period_end stays false).
+    cancel_at_period_end: !!sub.cancel_at_period_end || !!sub.cancel_at,
     livemode: !!sub.livemode,
     updated_at: new Date().toISOString()
   };
