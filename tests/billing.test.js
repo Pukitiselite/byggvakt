@@ -163,6 +163,15 @@ test("payment -> active -> cancel at period end -> renew -> cancel now -> resubs
   await call(webhook(deps), evt("customer.subscription.updated", { id: sub.id }));
   assert.equal((await call(status, authed("GET"))).body.cancel_at_period_end, false);
 
+  // Flexible billing: portal cancellation sets cancel_at instead of cancel_at_period_end
+  st.subs[sub.id].cancel_at = Math.floor(Date.now() / 1000) + 86400 * 30;
+  await call(webhook(deps), evt("customer.subscription.updated", { id: sub.id }));
+  r = await call(status, authed("GET"));
+  assert.deepEqual([r.body.active, r.body.cancel_at_period_end], [true, true]);
+  st.subs[sub.id].cancel_at = null;
+  await call(webhook(deps), evt("customer.subscription.updated", { id: sub.id }));
+  assert.equal((await call(status, authed("GET"))).body.cancel_at_period_end, false);
+
   st.subs[sub.id].status = "canceled";
   await call(webhook(deps), evt("customer.subscription.deleted", { id: sub.id }));
   r = await call(status, authed("GET"));
