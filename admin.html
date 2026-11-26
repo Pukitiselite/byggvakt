@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#103c33">
+<title>Byggvakt AI · Oversikt</title>
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+:root{--forest:#103c33;--green:#187e61;--mint:#2ee6a8;--ink:#17342e;--muted:#60766e;--line:#dbe6e0;--bg:#f3f7f4}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--forest);color:#fff;padding:18px 20px;display:flex;align-items:center;gap:12px}
+header img{width:40px;height:40px;border-radius:10px}header h1{font-size:20px;margin:0;flex:1}
+header button{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:10px;padding:8px 12px;font-size:14px;cursor:pointer}
+main{max-width:1100px;margin:0 auto;padding:20px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.card .n{font-size:32px;font-weight:800;color:var(--forest);line-height:1.1}.card .l{font-size:13px;color:var(--muted);margin-top:4px}
+.card.hi{background:var(--forest);border-color:var(--forest)}.card.hi .n{color:var(--mint)}.card.hi .l{color:#cfe7de}
+h2{font-size:17px;margin:8px 0 10px}
+.tbl{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:760px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{background:#eef5f1;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+tr:last-child td{border-bottom:0}
+.tag{display:inline-block;font-size:12px;font-weight:600;border-radius:999px;padding:3px 9px;margin-right:4px}
+.pay{background:#d7f7ea;color:#0d5a43}.cancel{background:#fff1d6;color:#7a5200}.test{background:#e6ecff;color:#2a3f8f}.own{background:#eee;color:#555}.no{background:#fde4e4;color:#8a1c1c}
+.muted{color:var(--muted);font-size:13px}
+form{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;max-width:380px;margin:40px auto;display:grid;gap:10px}
+input{font:inherit;padding:12px;border:1px solid var(--line);border-radius:10px}
+.btn{background:var(--green);color:#fff;border:0;border-radius:10px;padding:12px;font-weight:700;font-size:15px;cursor:pointer}
+#msg{min-height:20px}
+</style>
+</head>
+<body>
+<header><img src="/icons/icon-192.png" alt=""><h1>Byggvakt AI · Oversikt</h1><button id="refresh" type="button" hidden>Oppdater</button><button id="logout" type="button" hidden>Logg ut</button></header>
+<main>
+  <form id="login" hidden>
+    <strong>Logg inn som administrator</strong>
+    <input id="email" type="email" placeholder="E-post" autocomplete="username" required>
+    <input id="password" type="password" placeholder="Passord" autocomplete="current-password" required>
+    <button class="btn" type="submit">Logg inn</button>
+  </form>
+  <p id="msg" class="muted"></p>
+  <section id="stats" hidden>
+    <div class="cards" id="cards"></div>
+    <h2>Brukere</h2>
+    <div class="tbl"><table><thead><tr><th>E-post</th><th>Registrert</th><th>Bekreftet</th><th>Sist innlogget</th><th>Abonnement</th><th>Prosjekter</th><th>AI (30 d)</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <p class="muted" id="updated"></p>
+  </section>
+</main>
+<script>
+const SUPABASE_URL="https://fzsxqcqkzxrfxoirfmyh.supabase.co";
+const SUPABASE_KEY="sb_publishable__tjgQ5uGHOd_j-l06VnlVQ_st5GWCf2";
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const $=id=>document.getElementById(id);
+const fmt=d=>d?new Date(d).toLocaleString("nb-NO",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"–";
+const fmtD=d=>d?new Date(d).toLocaleDateString("nb-NO"):"–";
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
+function card(n,label,hi){const c=el("div","card"+(hi?" hi":""));c.append(el("div","n",String(n)),el("div","l",label));return c}
+
+async function load(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){$("login").hidden=false;$("stats").hidden=true;$("logout").hidden=true;$("refresh").hidden=true;$("msg").textContent="";return}
+  $("login").hidden=true;$("logout").hidden=false;$("refresh").hidden=false;$("msg").textContent="Henter tall …";
+  const r=await fetch("/api/admin-stats",{headers:{Authorization:"Bearer "+session.access_token}});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok){$("msg").textContent=(data.error||"Feil")+(r.status===403?" (innlogget som "+session.user.email+")":"");$("stats").hidden=true;return}
+  const t=data.totals;
+  $("cards").replaceChildren(
+    card(t.users,"Registrerte brukere",true),
+    card(t.customers,"Kunder (uten deg og testere)",true),
+    card(t.new_today,"Nye i dag"),
+    card(t.new_7d,"Nye siste 7 dager"),
+    card(t.new_30d,"Nye siste 30 dager"),
+    card(t.paying_customers,"Betalende kunder",true),
+    card(t.renewing,"Abonnement som fornyes"),
+    card(t.testers,"Testere (gratis)"),
+    card(t.projects,"Prosjekter totalt"),
+    card(t.ai_30d,"AI-analyser (30 d)")
+  );
+  const tb=$("rows");tb.replaceChildren();
+  for(const u of data.users){
+    const tr=el("tr");
+    const e=el("td");e.append(el("span",null,u.email+" "));
+    if(u.owner)e.append(el("span","tag own","deg"));if(u.tester)e.append(el("span","tag test","tester"));
+    const s=el("td");
+    if(u.paying)s.append(el("span","tag "+(u.subscription&&u.subscription.cancel_at_period_end?"cancel":"pay"),(u.subscription&&u.subscription.cancel_at_period_end?"slutter ":"aktiv til ")+fmtD(u.subscription&&u.subscription.current_period_end)));
+    else s.append(el("span","muted",u.subscription?u.subscription.status:"–"));
+    tr.append(e,el("td",null,fmt(u.created_at)),el("td",null,u.confirmed?"✅":"⏳"),el("td",null,fmt(u.last_sign_in_at)),s,el("td",null,String(u.projects)),el("td",null,String(u.ai_30d)));
+    tb.append(tr);
+  }
+  $("updated").textContent="Oppdatert "+fmt(data.generated_at);
+  $("stats").hidden=false;$("msg").textContent="";
+}
+$("login").addEventListener("submit",async e=>{e.preventDefault();$("msg").textContent="Logger inn …";
+  const {error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
+  if(error){$("msg").textContent="Innlogging feilet: "+error.message;return}$("password").value="";load()});
+$("logout").addEventListener("click",async()=>{await sb.auth.signOut();load()});
+$("refresh").addEventListener("click",load);
+load();
+</script>
+</body>
+</html>
