@@ -80,7 +80,7 @@ input[type=file]::file-selector-button{font:inherit;font-weight:650;margin-right
 #subStatus{min-height:0;margin:0 0 12px}#subStatus:empty{margin:0}
 .ai-panel{margin-bottom:20px}.ai-result{white-space:pre-wrap;background:#f3f7f4;border:1px solid var(--line);border-radius:12px;padding:16px;line-height:1.65;overflow-wrap:anywhere}.footer{font-size:13px;color:var(--muted);margin-top:24px}.hidden{display:none!important}
 .camera-btn{margin:6px 0 10px;width:100%;max-width:320px}.photo-analysis-todo{color:var(--muted);font-weight:600}.photo-meta{font-size:13px;color:var(--muted);margin-top:10px;line-height:1.6}.photo-meta a{color:var(--green)}.report-btn{margin:4px 0 10px;width:100%;max-width:320px}
-html.store-app #subPrice,html.store-app #subscribeButton,html.store-app #manageButton,html.store-app #installCard{display:none!important}
+html.store-app #subPrice,html.store-app #subscribeButton,html.store-app #trialNote,html.store-app #manageButton,html.store-app #installCard{display:none!important}
 @media(max-width:740px){.shell{padding:0 14px}.topbar{padding-top:15px;padding-bottom:15px}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.project-grid{grid-template-columns:1fr}.card{padding:17px}.two{grid-template-columns:1fr;gap:0}.toolbar{flex-direction:column}.toolbar input,.toolbar select{min-width:0}.intro .btn{width:100%}.dialog-body{padding:16px}.gallery{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
@@ -104,11 +104,10 @@ html.store-app #subPrice,html.store-app #subscribeButton,html.store-app #manageB
 </section>
   <section class="card" style="margin-bottom:20px">
   <h2>Byggvakt AI abonnement</h2>
-  <p id="subPrice">245 kr per måned</p>
+  <p id="subPrice">245 kr per måned · <strong>7 dager gratis</strong> for nye kunder</p>
   <p id="subStatus" class="message" role="status" aria-live="polite"></p>
-  <button id="subscribeButton" class="btn" type="button">
-    Start abonnement
-  </button>
+  <button id="subscribeButton" class="btn" type="button"><span id="subscribeText">Prøv gratis i 7 dager</span></button>
+  <p id="trialNote" class="muted" style="margin:8px 0 0">Ingen betaling de første 7 dagene. Deretter 245 kr per måned – avslutt når som helst før prøveperioden er over, så betaler du ingenting.</p>
   <button id="manageButton" class="btn secondary hidden" type="button">
     Administrer abonnement
   </button>
@@ -624,12 +623,25 @@ async function refreshSubscription() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "HTTP " + response.status);
 
+    // Free trial offer for first-time subscribers
+    const td = Number(data.trial_days) || 0;
+    $("subscribeText").textContent = td > 0 ? "Prøv gratis i " + td + " dager" : "Start abonnement";
+    $("trialNote").classList.toggle("hidden", !(td > 0 && !data.active));
+    $("subPrice").textContent = td > 0 ? "245 kr per måned · " + td + " dager gratis for nye kunder" : "245 kr per måned";
+
     // Anyone who has (or had) a subscription can manage it: cancel, renew, change card, invoices
     if (manage && data.status && data.status !== "none") manage.classList.remove("hidden");
 
     if (data.active && data.tester) {
       button.classList.add("hidden");
       statusEl.textContent = "✅ Gratis testtilgang er aktiv.";
+      clearTimeout(subTimer);
+    } else if (data.active && data.status === "trialing") {
+      button.classList.add("hidden");
+      const end = data.current_period_end ? new Date(data.current_period_end).toLocaleDateString("nb-NO") : "";
+      statusEl.textContent = data.cancel_at_period_end
+        ? "✅ Gratis prøveperiode" + (end ? " til " + end : "") + ". Den er sagt opp – du blir ikke belastet."
+        : "✅ Gratis prøveperiode" + (end ? " til " + end : "") + ". Deretter 245 kr per måned – avslutt når som helst før det.";
       clearTimeout(subTimer);
     } else if (data.active) {
       button.classList.add("hidden");

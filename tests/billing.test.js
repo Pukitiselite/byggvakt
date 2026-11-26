@@ -448,3 +448,31 @@ test("free tester access: only confirmed e-mails on the list", () => {
   assert.equal(billing.isFreeAccessUser(ok, undefined), false);
   assert.equal(billing.isFreeAccessUser(null, list), false);
 });
+
+test("7-day free trial only for first-time subscribers", async () => {
+  delete process.env.TRIAL_DAYS;
+  const db = installSupabase(); const st = mockStripe(); const deps = { stripe: st.api };
+  let r = await call(checkout(deps), authed("POST"));
+  assert.equal(r.code, 200);
+  let cs = Object.values(st.sessions)[0];
+  assert.equal(cs.subscription_data.trial_period_days, 7);
+  assert.equal(cs.subscription_data.metadata.supabase_user_id, "user-anna");
+  // status endpoint offers the trial before any subscription exists
+  assert.equal((await call(status, authed("GET"))).body.trial_days, 7);
+
+  // after a subscription has existed (even cancelled), no new trial
+  const sub = st.pay(cs.id);
+  await call(webhook(deps), evt("checkout.session.completed", st.sessions[cs.id]));
+  sub.status = "canceled";
+  await call(webhook(deps), evt("customer.subscription.deleted", { id: sub.id }));
+  assert.equal((await call(status, authed("GET"))).body.trial_days, 0);
+  r = await call(checkout(deps), authed("POST"));
+  assert.equal(r.code, 200);
+  cs = Object.values(st.sessions).find((x) => x.status === "open");
+  assert.equal(cs.subscription_data.trial_period_days, undefined);
+
+  // TRIAL_DAYS=0 switches it off
+  process.env.TRIAL_DAYS = "0";
+  assert.equal(require("../api/_billing").trialDays(), 0);
+  delete process.env.TRIAL_DAYS;
+});

@@ -235,7 +235,15 @@ function isFreeAccessUser(user, list = process.env.FREE_ACCESS_EMAILS) {
   return emails.includes(String(user.email).trim().toLowerCase());
 }
 
+// Free trial for first-time subscribers. TRIAL_DAYS env (0 = off), default 7, max 30.
+function trialDays() {
+  const raw = process.env.TRIAL_DAYS;
+  const n = raw === undefined || raw === "" ? 7 : Number(raw);
+  return Number.isFinite(n) ? Math.max(0, Math.min(30, Math.floor(n))) : 0;
+}
+
 module.exports = {
+  trialDays,
   isFreeAccessUser,
   SUPABASE_URL,
   ACCESS_STATUSES,

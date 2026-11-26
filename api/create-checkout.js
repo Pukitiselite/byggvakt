@@ -97,6 +97,10 @@ function createHandler(deps = {}) {
       const siteUrl = billing.safeSiteUrl(req.headers.host);
       const metadata = { supabase_user_id: user.id };
 
+      // 5) Free trial only for users who have never had a subscription (our DB and Stripe).
+      const days = billing.trialDays();
+      const trial = days > 0 && !(sameMode && row) && subs.data.length === 0 ? days : 0;
+
       const session = await stripe.checkout.sessions.create(
         {
           mode: "subscription",
@@ -104,14 +108,14 @@ function createHandler(deps = {}) {
           client_reference_id: user.id,
           line_items: [{ price: priceId, quantity: 1 }],
           metadata,
-          subscription_data: { metadata },
+          subscription_data: trial ? { metadata, trial_period_days: trial } : { metadata },
           success_url: siteUrl + "/?payment=success",
           cancel_url: siteUrl + "/?payment=cancelled"
         },
-        { idempotencyKey: billing.checkoutIdempotencyKey(user.id, priceId, customerId, siteUrl) }
+        { idempotencyKey: billing.checkoutIdempotencyKey(user.id, priceId + (trial ? ":trial" + trial : ""), customerId, siteUrl) }
       );
 
-      billing.log("info", "checkout.created", { user_id: user.id, session: session.id, livemode: session.livemode });
+      billing.log("info", "checkout.created", { user_id: user.id, session: session.id, livemode: session.livemode, trial_days: trial });
       return res.status(200).json({ url: session.url });
     } catch (err) {
       billing.log("error", "checkout.failed", {
