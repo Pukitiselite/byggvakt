@@ -36,6 +36,8 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({
       active: paid || tester,
       tester,
+      // a first-time subscriber gets a free trial (no subscription row in this mode yet)
+      trial_days: !shown ? billing.trialDays() : 0,
       status: shown?.status || "none",
       current_period_end: shown?.current_period_end || null,
       cancel_at_period_end: !!shown?.cancel_at_period_end
